@@ -7,7 +7,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { MapPin, Check, Globe, Clapperboard, Search, X, ChevronDown } from "lucide-react";
-import { usePreferences } from "@/stores/preferences";
+import { useFilters } from "@/stores/filters";
 import { cn } from "@/lib/cn";
 
 interface Cinema {
@@ -30,8 +30,8 @@ interface CinemaSelectorProps {
 }
 
 export function CinemaSelector({ cinemas }: CinemaSelectorProps) {
-  const { selectedCinemas, toggleCinema, selectAllCinemas, clearCinemas } =
-    usePreferences();
+  // Use the same filters store as the header - this ensures Settings and Header are synced
+  const { cinemaIds, toggleCinema, setCinemas } = useFilters();
 
   // Handle hydration mismatch by only rendering after mount
   const [mounted, setMounted] = useState(false);
@@ -90,28 +90,39 @@ export function CinemaSelector({ cinemas }: CinemaSelectorProps) {
 
   const selectArea = (areaCinemas: Cinema[]) => {
     const areaIds = areaCinemas.map((c) => c.id);
-    const allInArea = areaIds.every((id) => selectedCinemas.includes(id));
+    const showingAll = cinemaIds.length === 0;
+    const allInArea = showingAll || areaIds.every((id) => cinemaIds.includes(id));
 
     if (allInArea) {
-      // Deselect all in area
-      const newSelection = selectedCinemas.filter((id) => !areaIds.includes(id));
-      clearCinemas();
-      if (newSelection.length > 0) {
-        selectAllCinemas(newSelection);
+      // Deselect all in area - if showing all, set to all except this area
+      if (showingAll) {
+        setCinemas(cinemas.filter((c) => !areaIds.includes(c.id)).map((c) => c.id));
+      } else {
+        const newSelection = cinemaIds.filter((id) => !areaIds.includes(id));
+        setCinemas(newSelection);
       }
     } else {
       // Select all in area
-      const newSelection = [...new Set([...selectedCinemas, ...areaIds])];
-      selectAllCinemas(newSelection);
+      const newSelection = [...new Set([...cinemaIds, ...areaIds])];
+      setCinemas(newSelection);
     }
   };
 
-  // Initialize with all cinemas selected if none are selected
-  useEffect(() => {
-    if (mounted && selectedCinemas.length === 0 && cinemas.length > 0) {
-      selectAllCinemas(cinemas.map((c) => c.id));
+  // NOTE: Empty cinemaIds means "All Cinemas" - no auto-population needed
+  // The UI should display this as "all selected" visually but keep array empty
+  // This allows clearAllFilters() to work correctly
+  const isShowingAll = cinemaIds.length === 0;
+
+  // Smart toggle: when showing all, clicking a cinema should deselect it
+  // (meaning "all except this one")
+  const handleToggleCinema = (cinemaId: string) => {
+    if (isShowingAll) {
+      // User is deselecting one cinema from "all" - set to all except this one
+      setCinemas(cinemas.filter((c) => c.id !== cinemaId).map((c) => c.id));
+    } else {
+      toggleCinema(cinemaId);
     }
-  }, [mounted, selectedCinemas.length, cinemas, selectAllCinemas]);
+  };
 
   if (!mounted) {
     // Render skeleton while hydrating
@@ -130,8 +141,10 @@ export function CinemaSelector({ cinemas }: CinemaSelectorProps) {
     );
   }
 
-  const allSelected = selectedCinemas.length === cinemas.length;
-  const noneSelected = selectedCinemas.length === 0;
+  // Empty cinemaIds = "All Cinemas" (no filter), so treat it as allSelected
+  const allSelected = isShowingAll || cinemaIds.length === cinemas.length;
+  // "Clear All" should be disabled when already in "All Cinemas" mode (empty array)
+  const clearDisabled = isShowingAll;
 
   return (
     <div>
@@ -159,7 +172,7 @@ export function CinemaSelector({ cinemas }: CinemaSelectorProps) {
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-2 mb-4">
         <button
-          onClick={() => selectAllCinemas(cinemas.map((c) => c.id))}
+          onClick={() => setCinemas(cinemas.map((c) => c.id))}
           disabled={allSelected}
           className={cn(
             "px-3 py-1.5 text-sm rounded-lg border transition-colors",
@@ -171,11 +184,11 @@ export function CinemaSelector({ cinemas }: CinemaSelectorProps) {
           Select All
         </button>
         <button
-          onClick={() => clearCinemas()}
-          disabled={noneSelected}
+          onClick={() => setCinemas([])}
+          disabled={clearDisabled}
           className={cn(
             "px-3 py-1.5 text-sm rounded-lg border transition-colors",
-            noneSelected
+            clearDisabled
               ? "border-white/10 text-text-tertiary cursor-not-allowed"
               : "border-white/20 text-text-secondary hover:text-text-primary hover:border-white/30"
           )}
@@ -198,7 +211,7 @@ export function CinemaSelector({ cinemas }: CinemaSelectorProps) {
       {/* Selected Count */}
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-text-tertiary">
-          {selectedCinemas.length} of {cinemas.length} cinemas selected
+          {isShowingAll ? "All" : cinemaIds.length} of {cinemas.length} cinemas selected
         </p>
         {searchTerm && (
           <p className="text-sm text-text-tertiary">
@@ -212,10 +225,10 @@ export function CinemaSelector({ cinemas }: CinemaSelectorProps) {
         <div className="space-y-6">
           {groupedCinemas.map(([area, areaCinemas]) => {
             const isCollapsed = collapsedAreas.has(area);
-            const selectedInArea = areaCinemas.filter((c) =>
-              selectedCinemas.includes(c.id)
-            ).length;
-            const allInAreaSelected = selectedInArea === areaCinemas.length;
+            const selectedInArea = isShowingAll
+              ? areaCinemas.length
+              : areaCinemas.filter((c) => cinemaIds.includes(c.id)).length;
+            const allInAreaSelected = isShowingAll || selectedInArea === areaCinemas.length;
 
             return (
               <div key={area} className="border border-white/5 rounded-xl overflow-hidden">
@@ -266,8 +279,8 @@ export function CinemaSelector({ cinemas }: CinemaSelectorProps) {
                       <CinemaCard
                         key={cinema.id}
                         cinema={cinema}
-                        isSelected={selectedCinemas.includes(cinema.id)}
-                        onToggle={() => toggleCinema(cinema.id)}
+                        isSelected={isShowingAll || cinemaIds.includes(cinema.id)}
+                        onToggle={() => handleToggleCinema(cinema.id)}
                       />
                     ))}
                   </div>
@@ -283,8 +296,8 @@ export function CinemaSelector({ cinemas }: CinemaSelectorProps) {
             <CinemaCard
               key={cinema.id}
               cinema={cinema}
-              isSelected={selectedCinemas.includes(cinema.id)}
-              onToggle={() => toggleCinema(cinema.id)}
+              isSelected={isShowingAll || cinemaIds.includes(cinema.id)}
+              onToggle={() => handleToggleCinema(cinema.id)}
             />
           ))}
         </div>

@@ -41,8 +41,8 @@ export default async function SettingsPage() {
             My Cinemas
           </h2>
           <p className="text-text-secondary text-sm mb-6">
-            Select the cinemas you want to see screenings from. Films showing at
-            unselected cinemas will be hidden from your calendar.
+            Select the cinemas you want to see screenings from. Your selection
+            syncs with the cinema filter in the header.
           </p>
 
           <CinemaSelector cinemas={allCinemas} />

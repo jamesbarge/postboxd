@@ -16,11 +16,14 @@ import {
   X,
   Settings,
   Check,
+  Heart,
 } from "lucide-react";
-import { format, addDays, startOfToday, isSameDay } from "date-fns";
+import { format, addDays, startOfToday, isSameDay, startOfMonth, endOfMonth } from "date-fns";
+import { DayPicker } from "react-day-picker";
 import { cn } from "@/lib/cn";
-import { useFilters } from "@/stores/filters";
+import { useFilters, TIME_PRESETS, formatTimeRange, formatHour } from "@/stores/filters";
 import { Button, IconButton } from "@/components/ui";
+import { Clock } from "lucide-react";
 
 interface Cinema {
   id: string;
@@ -43,7 +46,7 @@ export function Header({ cinemas }: HeaderProps) {
     <header className="sticky top-0 z-50 bg-background-primary border-b border-white/[0.06]">
       {/* Top Bar - Logo and Settings */}
       <div className="border-b border-white/[0.04]">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="group">
             <span className="font-display text-xl text-text-primary tracking-tight hover:text-accent-gold transition-colors">
@@ -51,20 +54,30 @@ export function Header({ cinemas }: HeaderProps) {
             </span>
           </Link>
 
-          {/* Settings */}
-          <Link href="/settings">
-            <IconButton
-              variant="ghost"
-              size="sm"
-              icon={<Settings className="w-5 h-5" />}
-              label="Settings"
-            />
-          </Link>
+          {/* Navigation Icons */}
+          <div className="flex items-center gap-1">
+            <Link href="/watchlist">
+              <IconButton
+                variant="ghost"
+                size="sm"
+                icon={<Heart className="w-5 h-5" />}
+                label="Watchlist"
+              />
+            </Link>
+            <Link href="/settings">
+              <IconButton
+                variant="ghost"
+                size="sm"
+                icon={<Settings className="w-5 h-5" />}
+                label="Settings"
+              />
+            </Link>
+          </div>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="max-w-6xl mx-auto px-4 py-3">
+      <div className="px-4 sm:px-6 lg:px-8 py-3">
         <div className="flex items-center gap-3">
           {/* Date Picker */}
           <DateFilter mounted={mounted} />
@@ -83,11 +96,12 @@ export function Header({ cinemas }: HeaderProps) {
   );
 }
 
-// Date Filter Component
+// Date & Time Filter Component
 function DateFilter({ mounted }: { mounted: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showTimeCustom, setShowTimeCustom] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { dateFrom, dateTo, setDateRange } = useFilters();
+  const { dateFrom, dateTo, setDateRange, timeFrom, timeTo, setTimeRange } = useFilters();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -100,26 +114,50 @@ function DateFilter({ mounted }: { mounted: boolean }) {
   }, []);
 
   const today = startOfToday();
-  const quickOptions = [
-    { label: "Today", from: today, to: today },
-    { label: "This Weekend", from: getNextWeekend(), to: addDays(getNextWeekend(), 1) },
-    { label: "Next 7 Days", from: today, to: addDays(today, 6) },
-    { label: "Next 30 Days", from: today, to: addDays(today, 29) },
-  ];
 
   const displayText = useMemo(() => {
-    if (!mounted) return "Any Date";
-    if (!dateFrom && !dateTo) return "Any Date";
-    if (dateFrom && dateTo && isSameDay(dateFrom, dateTo)) {
-      return format(dateFrom, "d MMM");
-    }
-    if (dateFrom && dateTo) {
-      return `${format(dateFrom, "d MMM")} - ${format(dateTo, "d MMM")}`;
-    }
-    return "Any Date";
-  }, [mounted, dateFrom, dateTo]);
+    if (!mounted) return "When";
 
-  const hasDateFilter = mounted && (dateFrom || dateTo);
+    const datePart = (() => {
+      if (!dateFrom && !dateTo) return null;
+      if (dateFrom && dateTo && isSameDay(dateFrom, dateTo)) {
+        return format(dateFrom, "EEE d MMM");
+      }
+      if (dateFrom && dateTo) {
+        return `${format(dateFrom, "d MMM")} - ${format(dateTo, "d MMM")}`;
+      }
+      return null;
+    })();
+
+    const timePart = timeFrom !== null || timeTo !== null
+      ? formatTimeRange(timeFrom, timeTo)
+      : null;
+
+    if (!datePart && !timePart) return "When";
+    if (datePart && timePart) return `${datePart}, ${timePart}`;
+    return datePart || timePart || "When";
+  }, [mounted, dateFrom, dateTo, timeFrom, timeTo]);
+
+  const hasFilter = mounted && (dateFrom || dateTo || timeFrom !== null || timeTo !== null);
+
+  const handleDaySelect = (day: Date | undefined) => {
+    if (day) {
+      setDateRange(day, day);
+    }
+  };
+
+  const handleTimePreset = (preset: typeof TIME_PRESETS[number] | null) => {
+    if (preset === null) {
+      setTimeRange(null, null);
+    } else {
+      setTimeRange(preset.from, preset.to);
+    }
+    setShowTimeCustom(false);
+  };
+
+  const isTimePresetActive = (preset: typeof TIME_PRESETS[number]) => {
+    return timeFrom === preset.from && timeTo === preset.to;
+  };
 
   return (
     <div ref={containerRef} className="relative">
@@ -127,7 +165,7 @@ function DateFilter({ mounted }: { mounted: boolean }) {
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all min-w-[140px]",
-          hasDateFilter
+          hasFilter
             ? "bg-accent-gold/10 border-accent-gold/30 text-accent-gold"
             : "bg-background-secondary border-white/10 text-text-secondary hover:border-white/20 hover:text-text-primary"
         )}
@@ -138,45 +176,188 @@ function DateFilter({ mounted }: { mounted: boolean }) {
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 z-50 w-64 bg-background-secondary border border-white/10 rounded-xl shadow-2xl overflow-hidden">
-          <div className="p-2">
-            <button
-              onClick={() => {
-                setDateRange(null, null);
-                setIsOpen(false);
+        <div className="absolute top-full left-0 sm:left-0 right-0 sm:right-auto mt-2 z-50 w-[calc(100vw-2rem)] sm:w-auto bg-background-secondary border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+          {/* Date Section */}
+          <div className="p-3 border-b border-white/5">
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="w-4 h-4 text-text-tertiary" />
+              <span className="text-xs font-medium text-text-secondary uppercase tracking-wide">Date</span>
+            </div>
+
+            {/* Quick Date Options */}
+            <div className="flex flex-wrap gap-1 mb-3">
+              <button
+                onClick={() => setDateRange(null, null)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
+                  !dateFrom && !dateTo
+                    ? "bg-accent-gold text-background-primary"
+                    : "bg-white/5 text-text-secondary hover:bg-white/10 hover:text-text-primary"
+                )}
+              >
+                Any Date
+              </button>
+              <button
+                onClick={() => setDateRange(today, today)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
+                  dateFrom && isSameDay(dateFrom, today) && dateTo && isSameDay(dateTo, today)
+                    ? "bg-accent-gold text-background-primary"
+                    : "bg-white/5 text-text-secondary hover:bg-white/10 hover:text-text-primary"
+                )}
+              >
+                Today
+              </button>
+              <button
+                onClick={() => {
+                  const weekend = getNextWeekend();
+                  setDateRange(weekend, addDays(weekend, 1));
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
+                  "bg-white/5 text-text-secondary hover:bg-white/10 hover:text-text-primary"
+                )}
+              >
+                Weekend
+              </button>
+              <button
+                onClick={() => setDateRange(today, addDays(today, 6))}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
+                  "bg-white/5 text-text-secondary hover:bg-white/10 hover:text-text-primary"
+                )}
+              >
+                7 Days
+              </button>
+            </div>
+
+            {/* Calendar */}
+            <DayPicker
+              mode="single"
+              selected={dateFrom || undefined}
+              onSelect={handleDaySelect}
+              defaultMonth={dateFrom || today}
+              disabled={{ before: today }}
+              showOutsideDays
+              classNames={{
+                root: "text-text-primary w-[280px]",
+                months: "flex flex-col",
+                month: "space-y-2",
+                month_caption: "flex justify-center relative items-center h-8 mb-2",
+                caption_label: "text-sm font-medium text-text-primary",
+                nav: "flex items-center gap-1 absolute inset-x-0 justify-between",
+                button_previous: "p-1.5 rounded-lg hover:bg-white/10 text-text-secondary hover:text-text-primary transition-colors",
+                button_next: "p-1.5 rounded-lg hover:bg-white/10 text-text-secondary hover:text-text-primary transition-colors",
+                month_grid: "w-full",
+                weekdays: "grid grid-cols-7 gap-1 mb-1",
+                weekday: "text-text-tertiary text-xs font-medium h-8 flex items-center justify-center",
+                week: "grid grid-cols-7 gap-1",
+                day: "h-9 p-0",
+                day_button: "w-9 h-9 rounded-lg flex items-center justify-center text-sm transition-colors hover:bg-white/10 text-text-secondary hover:text-text-primary",
+                selected: "[&>button]:!bg-accent-gold [&>button]:!text-background-primary [&>button]:hover:!bg-accent-gold [&>button]:font-medium",
+                today: "[&>button]:ring-1 [&>button]:ring-accent-gold/50 [&>button]:text-accent-gold [&>button]:font-medium",
+                outside: "[&>button]:text-text-muted [&>button]:opacity-50",
+                disabled: "[&>button]:text-text-muted [&>button]:opacity-30 [&>button]:cursor-not-allowed [&>button]:hover:bg-transparent",
               }}
-              className={cn(
-                "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
-                !dateFrom && !dateTo
-                  ? "bg-accent-gold/10 text-accent-gold"
-                  : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
-              )}
-            >
-              Any Date
-            </button>
-            {quickOptions.map((option) => {
-              const isSelected = dateFrom && dateTo &&
-                isSameDay(dateFrom, option.from) &&
-                isSameDay(dateTo, option.to);
-              return (
-                <button
-                  key={option.label}
-                  onClick={() => {
-                    setDateRange(option.from, option.to);
-                    setIsOpen(false);
-                  }}
-                  className={cn(
-                    "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
-                    isSelected
-                      ? "bg-accent-gold/10 text-accent-gold"
-                      : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
-                  )}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
+            />
           </div>
+
+          {/* Time Section */}
+          <div className="p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4 text-text-tertiary" />
+              <span className="text-xs font-medium text-text-secondary uppercase tracking-wide">Time</span>
+            </div>
+
+            {/* Time Presets */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              <button
+                onClick={() => handleTimePreset(null)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
+                  timeFrom === null && timeTo === null
+                    ? "bg-accent-gold text-background-primary"
+                    : "bg-white/5 text-text-secondary hover:bg-white/10 hover:text-text-primary"
+                )}
+              >
+                Any Time
+              </button>
+              {TIME_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  onClick={() => handleTimePreset(preset)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
+                    isTimePresetActive(preset)
+                      ? "bg-accent-gold text-background-primary"
+                      : "bg-white/5 text-text-secondary hover:bg-white/10 hover:text-text-primary"
+                  )}
+                  title={preset.description}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Time Toggle */}
+            <button
+              onClick={() => setShowTimeCustom(!showTimeCustom)}
+              className="text-xs text-text-tertiary hover:text-text-secondary transition-colors"
+            >
+              {showTimeCustom ? "Hide custom" : "Custom time range..."}
+            </button>
+
+            {/* Custom Time Inputs */}
+            {showTimeCustom && (
+              <div className="mt-3 flex items-center gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-text-tertiary mb-1">From</label>
+                  <select
+                    value={timeFrom ?? ""}
+                    onChange={(e) => setTimeRange(
+                      e.target.value === "" ? null : Number(e.target.value),
+                      timeTo
+                    )}
+                    className="w-full px-2 py-1.5 rounded-lg bg-background-tertiary border border-white/10 text-sm text-text-primary focus:outline-none focus:border-accent-gold/50"
+                  >
+                    <option value="">Any</option>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <option key={i} value={i}>{formatHour(i)}</option>
+                    ))}
+                  </select>
+                </div>
+                <span className="text-text-tertiary mt-5">–</span>
+                <div className="flex-1">
+                  <label className="block text-xs text-text-tertiary mb-1">To</label>
+                  <select
+                    value={timeTo ?? ""}
+                    onChange={(e) => setTimeRange(
+                      timeFrom,
+                      e.target.value === "" ? null : Number(e.target.value)
+                    )}
+                    className="w-full px-2 py-1.5 rounded-lg bg-background-tertiary border border-white/10 text-sm text-text-primary focus:outline-none focus:border-accent-gold/50"
+                  >
+                    <option value="">Any</option>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <option key={i} value={i}>{formatHour(i)}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Done Button */}
+          {hasFilter && (
+            <div className="p-2 border-t border-white/5">
+              <button
+                onClick={() => setIsOpen(false)}
+                className="w-full px-3 py-2 rounded-lg text-sm font-medium bg-accent-gold text-background-primary hover:bg-accent-gold/90 transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -184,43 +365,140 @@ function DateFilter({ mounted }: { mounted: boolean }) {
 }
 
 // Film Search Filter Component
+interface FilmSuggestion {
+  id: string;
+  title: string;
+  year: number | null;
+  directors: string[];
+  posterUrl: string | null;
+}
+
 function FilmSearchFilter({ mounted }: { mounted: boolean }) {
   const { filmSearch, setFilmSearch } = useFilters();
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<FilmSuggestion[]>([]);
+  const [allFilms, setAllFilms] = useState<FilmSuggestion[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
 
-  // Keyboard shortcut
+  // Fetch all films once for browse mode
+  useEffect(() => {
+    async function fetchAllFilms() {
+      try {
+        const res = await fetch("/api/films/search?browse=true");
+        const data = await res.json();
+        setAllFilms(data.results || []);
+      } catch {
+        setAllFilms([]);
+      }
+    }
+    fetchAllFilms();
+  }, []);
+
+  // Fetch suggestions with debounce when searching
+  useEffect(() => {
+    // If no search term, don't fetch (we'll use allFilms for browsing)
+    if (!filmSearch.trim()) {
+      setSuggestions([]);
+      return;
+    }
+
+    if (filmSearch.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    const debounceTimer = setTimeout(async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`/api/films/search?q=${encodeURIComponent(filmSearch)}`);
+        const data = await res.json();
+        setSuggestions(data.results || []);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(debounceTimer);
+  }, [filmSearch]);
+
+  // Get display list: search results if searching, all films if browsing
+  const displayList = filmSearch.trim() ? suggestions : allFilms;
+
+  // Close on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsFocused(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Keyboard navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         inputRef.current?.focus();
       }
-      // Escape to clear and blur
-      if (e.key === "Escape" && document.activeElement === inputRef.current) {
-        setFilmSearch("");
-        inputRef.current?.blur();
+
+      if (document.activeElement === inputRef.current) {
+        if (e.key === "Escape") {
+          setFilmSearch("");
+          setSuggestions([]);
+          inputRef.current?.blur();
+        } else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setSelectedIndex((prev) => Math.min(prev + 1, displayList.length - 1));
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setSelectedIndex((prev) => Math.max(prev - 1, -1));
+        } else if (e.key === "Enter" && selectedIndex >= 0 && displayList[selectedIndex]) {
+          e.preventDefault();
+          handleSelectFilm(displayList[selectedIndex]);
+        }
       }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [setFilmSearch]);
+  }, [setFilmSearch, displayList, selectedIndex]);
+
+  // Reset selection when display list changes
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [displayList]);
+
+  const handleSelectFilm = (film: FilmSuggestion) => {
+    setFilmSearch(film.title);
+    setSuggestions([]);
+    setIsFocused(false);
+    inputRef.current?.blur();
+  };
 
   const hasValue = mounted && filmSearch.trim();
   const showShortcutHint = !isFocused && !hasValue;
+  const showDropdown = isFocused && (displayList.length > 0 || isLoading);
 
   return (
-    <div className="relative flex-1 max-w-xs">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none" />
+    <div ref={containerRef} className="relative flex-1 max-w-xs">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none z-10" />
       <input
         ref={inputRef}
         type="text"
         value={mounted ? filmSearch : ""}
         onChange={(e) => setFilmSearch(e.target.value)}
         onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
         placeholder="Search films..."
         aria-label="Search films"
+        aria-expanded={showDropdown}
+        aria-autocomplete="list"
+        autoComplete="off"
         className={cn(
           "w-full pl-9 py-2 rounded-lg border bg-background-secondary text-sm text-text-primary placeholder:text-text-tertiary",
           "transition-all duration-150",
@@ -241,12 +519,81 @@ function FilmSearchFilter({ mounted }: { mounted: boolean }) {
       {/* Clear button */}
       {hasValue && (
         <button
-          onClick={() => setFilmSearch("")}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-surface-overlay-hover text-text-tertiary hover:text-text-primary transition-colors"
+          onClick={() => {
+            setFilmSearch("");
+            setSuggestions([]);
+          }}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-surface-overlay-hover text-text-tertiary hover:text-text-primary transition-colors z-10"
           aria-label="Clear search"
         >
           <X className="w-3.5 h-3.5" />
         </button>
+      )}
+
+      {/* Films Dropdown */}
+      {showDropdown && (
+        <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-background-secondary border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+          {/* Header showing count */}
+          {!filmSearch.trim() && displayList.length > 0 && (
+            <div className="px-3 py-2 border-b border-white/5 text-xs text-text-tertiary">
+              {displayList.length} films • scroll to browse
+            </div>
+          )}
+          {isLoading ? (
+            <div className="px-4 py-3 text-sm text-text-tertiary">Searching...</div>
+          ) : (
+            <ul role="listbox" className="max-h-96 overflow-y-auto">
+              {displayList.map((film, index) => (
+                <li key={film.id} role="option" aria-selected={index === selectedIndex}>
+                  <button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectFilm(film);
+                    }}
+                    onMouseEnter={() => setSelectedIndex(index)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2 text-left transition-colors",
+                      index === selectedIndex
+                        ? "bg-accent-gold/10 text-text-primary"
+                        : "text-text-secondary hover:bg-white/5"
+                    )}
+                  >
+                    {/* Mini Poster */}
+                    <div className="w-8 h-12 rounded overflow-hidden bg-background-tertiary shrink-0">
+                      {film.posterUrl && !film.posterUrl.includes('poster-placeholder') ? (
+                        <img
+                          src={film.posterUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-text-tertiary">
+                          <Search className="w-3 h-3" />
+                        </div>
+                      )}
+                    </div>
+                    {/* Film Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">
+                        {film.title}
+                        {film.year && (
+                          <span className="text-text-tertiary font-normal ml-1">
+                            ({film.year})
+                          </span>
+                        )}
+                      </div>
+                      {film.directors.length > 0 && (
+                        <div className="text-xs text-text-tertiary truncate">
+                          {film.directors.slice(0, 2).join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   );
@@ -315,7 +662,7 @@ function CinemaFilter({ cinemas, mounted }: { cinemas: Cinema[]; mounted: boolea
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 z-50 w-72 bg-background-secondary border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+        <div className="absolute top-full right-0 sm:left-0 sm:right-auto mt-2 z-50 w-[calc(100vw-2rem)] sm:w-72 max-w-72 bg-background-secondary border border-white/10 rounded-xl shadow-2xl overflow-hidden">
           {/* Search Input */}
           <div className="p-2 border-b border-white/5">
             <div className="relative">
