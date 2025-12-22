@@ -1,13 +1,18 @@
-// @ts-nocheck
 /**
  * Lexi Cinema Scraper (Kensal Rise)
  *
  * Social enterprise cinema - profits go to charity
  * Website: https://thelexicinema.co.uk
+ *
+ * NOTE: Website uses TheLexiCinema.dll pattern (legacy ASP.NET)
+ * Main page: /TheLexiCinema.dll/Home
+ * Film listings: /TheLexiCinema.dll/WhatsOn
  */
 
 import * as cheerio from "cheerio";
 import type { RawScreening, ScraperConfig, CinemaScraper } from "../types";
+import { getBrowser, closeBrowser, createPage } from "../utils/browser";
+import type { Page } from "playwright";
 
 // ============================================================================
 // Lexi Cinema Configuration
@@ -37,13 +42,26 @@ export const LEXI_VENUE = {
 
 export class LexiScraper implements CinemaScraper {
   config = LEXI_CONFIG;
+  private page: Page | null = null;
 
   async scrape(): Promise<RawScreening[]> {
-    console.log(`[lexi] Starting scrape...`);
+    console.log(`[lexi] Starting scrape with Playwright...`);
 
     try {
-      const html = await this.fetchPage("/whats-on/");
-      const screenings = this.parseScreenings(html);
+      await this.initialize();
+
+      // Navigate to the homepage which shows all film listings
+      const url = `${this.config.baseUrl}/TheLexiCinema.dll/Home`;
+      console.log(`[lexi] Navigating to ${url}...`);
+
+      await this.page!.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+      await this.page!.waitForTimeout(3000);
+
+      // Get the HTML and parse with Cheerio
+      const html = await this.page!.content();
+      const screenings = this.parseFilmCardsFromHtml(html);
+
+      await this.cleanup();
 
       const validated = this.validate(screenings);
       console.log(`[lexi] Found ${validated.length} valid screenings`);
@@ -51,43 +69,146 @@ export class LexiScraper implements CinemaScraper {
       return validated;
     } catch (error) {
       console.error(`[lexi] Scrape failed:`, error);
+      await this.cleanup();
       throw error;
     }
   }
 
-  private async fetchPage(path: string): Promise<string> {
-    const url = `${this.config.baseUrl}${path}`;
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-        "Accept": "text/html,application/xhtml+xml",
-      },
+  private async initialize(): Promise<void> {
+    console.log(`[lexi] Launching browser...`);
+    await getBrowser();
+    this.page = await createPage();
+  }
+
+  private async cleanup(): Promise<void> {
+    if (this.page) {
+      await this.page.close();
+      this.page = null;
+    }
+    await closeBrowser();
+    console.log(`[lexi] Browser closed`);
+  }
+
+  /**
+   * Parse film cards from HTML using Cheerio
+   * DOM structure: link with h3 title, sibling element with date text
+   */
+  private parseFilmCardsFromHtml(html: string): RawScreening[] {
+    const $ = cheerio.load(html);
+    const screenings: RawScreening[] = [];
+    const seen = new Set<string>();
+
+    // Find all links to film detail pages that contain an h3
+    $('a[href*="WhatsOn?f="]').each((_, linkEl) => {
+      const $link = $(linkEl);
+      const $h3 = $link.find('h3');
+
+      if ($h3.length === 0) return;
+
+      const title = $h3.text().trim();
+      if (!title || title.length < 2) return;
+
+      // Skip section headings
+      if (/^(Films?|Family Fun|Event|Theatre|Black History|Talking Pictures|Main Features|Q&As|Spotlight|Women of|Baby-Friendly|Audio|HOH|Relaxed|Seasons|Contact|Subscribe)/i.test(title)) {
+        return;
+      }
+
+      // Avoid duplicates
+      if (seen.has(title)) return;
+      seen.add(title);
+
+      const bookingUrl = $link.attr('href') || "";
+
+      // Get the parent container and look for date text
+      const $parent = $link.parent();
+      const parentText = $parent.text();
+
+      // Look for date patterns
+      let dateText = "";
+
+      // Pattern: "Mon 22 Dec 15:00" (with time)
+      let match = parentText.match(/(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}:\d{2})/i);
+      if (match) {
+        dateText = match[0];
+      } else {
+        // Pattern: just "Mon 22 Dec" (without time)
+        match = parentText.match(/(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
+        if (match) {
+          dateText = match[0];
+        }
+      }
+
+      console.log(`[lexi] Processing: "${title}" - parent text: "${parentText.substring(0, 80)}..." - date: "${dateText}"`);
+
+      if (!dateText) return;
+
+      const datetime = this.parseLexiDateTime(dateText);
+      if (!datetime) return;
+
+      const cleanedTitle = this.cleanTitle(title);
+      const fullBookingUrl = bookingUrl.startsWith("http")
+        ? bookingUrl
+        : `${this.config.baseUrl}${bookingUrl}`;
+
+      screenings.push({
+        filmTitle: cleanedTitle,
+        datetime,
+        bookingUrl: fullBookingUrl,
+        sourceId: `lexi-${cleanedTitle.toLowerCase().replace(/\s+/g, "-")}-${datetime.toISOString()}`,
+      });
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${url}: ${response.status}`);
+    console.log(`[lexi] Found ${screenings.length} screenings from HTML`);
+    return screenings;
+  }
+
+  /**
+   * Parse Lexi date format: "Mon 22 Dec 15:00" or "Mon 22 Dec"
+   */
+  private parseLexiDateTime(text: string): Date | null {
+    // Pattern: "Mon 22 Dec 15:00" or "Mon 22 Dec"
+    const match = text.match(/(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?:\s+(\d{1,2}):(\d{2}))?/i);
+    if (!match) return null;
+
+    const months: Record<string, number> = {
+      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+    };
+
+    const day = parseInt(match[2]);
+    const month = months[match[3].toLowerCase()];
+    const hours = match[4] ? parseInt(match[4]) : 14; // Default to 14:00 if no time
+    const minutes = match[5] ? parseInt(match[5]) : 0;
+
+    const year = new Date().getFullYear();
+    const datetime = new Date(year, month, day, hours, minutes);
+
+    // If date is in past, assume next year
+    if (datetime < new Date()) {
+      datetime.setFullYear(year + 1);
     }
 
-    return response.text();
+    return datetime;
   }
 
   private parseScreenings(html: string): RawScreening[] {
     const $ = cheerio.load(html);
     const screenings: RawScreening[] = [];
 
-    // Lexi typically lists films with dates and times
-    $(".film, .event, .screening, article, .programme-item").each((_, el) => {
+    // Lexi uses film cards with dates like "Mon 22 Dec 15:00" or "Showing from Mon 22 Dec"
+    // Look for film containers
+    $(".film, .event, .screening, article, .programme-item, [class*='card'], [class*='film']").each((_, el) => {
       const $film = $(el);
 
-      // Extract title
-      const title = $film.find("h2, h3, .title, .film-title").first().text().trim();
+      // Extract title from headings or title classes
+      const title = $film.find("h2, h3, h4, .title, .film-title, [class*='title']").first().text().trim();
       if (!title || title.length < 2) return;
 
       // Get the full text for date/time parsing
       const fullText = $film.text();
 
-      // Look for showtimes
-      $film.find("a[href*='book'], .showtime, .time").each((_, timeEl) => {
+      // Look for individual showtime links
+      $film.find("a[href*='book'], a[href*='Book'], .showtime, .time, [class*='time']").each((_, timeEl) => {
         const $time = $(timeEl);
         const timeText = $time.text().trim();
         const bookingUrl = $time.attr("href") || $film.find("a").first().attr("href") || "";
@@ -118,7 +239,8 @@ export class LexiScraper implements CinemaScraper {
   private extractScreeningsFromText(
     text: string,
     title: string,
-    $film: cheerio.Cheerio<cheerio.Element>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    $film: any
   ): RawScreening[] {
     const screenings: RawScreening[] = [];
 

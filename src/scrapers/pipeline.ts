@@ -9,6 +9,15 @@ import { eq } from "drizzle-orm";
 import { matchFilmToTMDB, getTMDBClient, isRepertoryFilm, getDecade } from "@/lib/tmdb";
 import { getPosterService } from "@/lib/posters";
 import { extractFilmTitleCached, batchExtractTitles } from "@/lib/title-extractor";
+import {
+  findMatchingFilm,
+  isSimilarityConfigured,
+  isClaudeConfigured,
+} from "@/lib/film-similarity";
+import {
+  classifyEventCached,
+  likelyNeedsClassification,
+} from "@/lib/event-classifier";
 import type { RawScreening } from "./types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -20,6 +29,42 @@ interface PipelineResult {
   scrapedAt: Date;
 }
 
+// Film cache for efficient lookups during pipeline run
+// Maps normalizedTitle -> film record
+type FilmRecord = typeof films.$inferSelect;
+let filmCache: Map<string, FilmRecord> | null = null;
+
+/**
+ * Initialize or refresh the film cache
+ * Loads ALL films from DB once per pipeline run for O(1) lookups
+ */
+async function initFilmCache(): Promise<Map<string, FilmRecord>> {
+  const allFilms = await db.select().from(films);
+  const cache = new Map<string, FilmRecord>();
+
+  for (const film of allFilms) {
+    const normalized = normalizeTitle(film.title);
+    // If duplicate normalized titles exist, keep the one with more data (has TMDB ID)
+    const existing = cache.get(normalized);
+    if (!existing || (film.tmdbId && !existing.tmdbId)) {
+      cache.set(normalized, film);
+    }
+  }
+
+  console.log(`[Pipeline] Film cache initialized with ${cache.size} unique films (${allFilms.length} total)`);
+  return cache;
+}
+
+/**
+ * Add a new film to the cache
+ */
+function addToFilmCache(film: FilmRecord) {
+  if (filmCache) {
+    const normalized = normalizeTitle(film.title);
+    filmCache.set(normalized, film);
+  }
+}
+
 /**
  * Process raw screenings through the full pipeline
  */
@@ -28,6 +73,9 @@ export async function processScreenings(
   rawScreenings: RawScreening[]
 ): Promise<PipelineResult> {
   console.log(`[Pipeline] Processing ${rawScreenings.length} screenings for ${cinemaId}`);
+
+  // Initialize film cache for this pipeline run (loads ALL films once)
+  filmCache = await initFilmCache();
 
   const result: PipelineResult = {
     cinemaId,
@@ -137,11 +185,9 @@ async function getOrCreateFilm(
 
   const normalized = normalizeTitle(cleanedTitle);
 
-  // Try to find existing film with similar title
-  const existingFilms = await db.select().from(films).limit(100);
-  const existing = existingFilms.find(
-    (f) => normalizeTitle(f.title) === normalized
-  );
+  // Try to find existing film using the pre-loaded cache (O(1) lookup)
+  // This fixes the previous bug where .limit(100) missed most films
+  const existing = filmCache?.get(normalized);
 
   if (existing) {
     // If existing film lacks a poster, try to find one
@@ -149,6 +195,29 @@ async function getOrCreateFilm(
       await tryUpdatePoster(existing.id, title, existing.year, existing.imdbId, existing.tmdbId, scraperPosterUrl);
     }
     return existing.id;
+  }
+
+  // If no exact match, try trigram similarity search
+  // This catches fuzzy matches like "Blade Runner 2049" vs "BLADE RUNNER 2049 (4K)"
+  if (isSimilarityConfigured()) {
+    try {
+      // Use Claude confirmation for medium-confidence matches if API key is available
+      const match = await findMatchingFilm(
+        cleanedTitle,
+        scraperYear,
+        isClaudeConfigured() // Enable Claude confirmation if available
+      );
+
+      if (match) {
+        console.log(
+          `[Pipeline] Similarity match (${match.confidence}): "${cleanedTitle}" → existing film`
+        );
+        return match.filmId;
+      }
+    } catch (e) {
+      // Similarity search failed, continue with normal flow
+      console.warn(`[Pipeline] Similarity search failed for "${cleanedTitle}":`, e);
+    }
   }
 
   // Try to match with TMDB using the cleaned title
@@ -224,6 +293,37 @@ async function getOrCreateFilm(
         tmdbRating: details.details.vote_average,
       });
 
+      // Add to cache so subsequent lookups in this run find it
+      addToFilmCache({
+        id: filmId,
+        tmdbId: match.tmdbId,
+        imdbId: details.details.imdb_id,
+        title: details.details.title,
+        originalTitle: details.details.original_title,
+        year: match.year,
+        runtime: details.details.runtime,
+        directors: details.directors,
+        cast: details.cast as FilmRecord["cast"],
+        genres: details.details.genres.map((g) => g.name.toLowerCase()),
+        countries: details.details.production_countries.map((c) => c.iso_3166_1),
+        languages: details.details.spoken_languages.map((l) => l.iso_639_1),
+        certification: details.certification,
+        synopsis: details.details.overview,
+        tagline: details.details.tagline,
+        posterUrl,
+        backdropUrl: details.details.backdrop_path
+          ? `https://image.tmdb.org/t/p/w1280${details.details.backdrop_path}`
+          : null,
+        trailerUrl: null,
+        isRepertory: isRepertoryFilm(details.details.release_date),
+        releaseStatus: null,
+        decade: match.year ? getDecade(match.year) : null,
+        tmdbRating: details.details.vote_average,
+        letterboxdUrl: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
       console.log(`[Pipeline] Created film: ${details.details.title} (${match.year})`);
       return filmId;
     }
@@ -272,6 +372,35 @@ async function getOrCreateFilm(
     languages: [],
   });
 
+  // Add to cache so subsequent lookups in this run find it
+  addToFilmCache({
+    id: filmId,
+    title: cleanedTitle,
+    originalTitle: null,
+    year: scraperYear ?? null,
+    runtime: null,
+    directors: scraperDirector ? [scraperDirector] : [],
+    cast: [],
+    genres: [],
+    countries: [],
+    languages: [],
+    certification: null,
+    synopsis: null,
+    tagline: null,
+    posterUrl,
+    backdropUrl: null,
+    trailerUrl: null,
+    isRepertory: false,
+    releaseStatus: null,
+    decade: null,
+    tmdbId: null,
+    imdbId: null,
+    tmdbRating: null,
+    letterboxdUrl: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
   console.log(`[Pipeline] Created film without TMDB: ${cleanedTitle}${posterUrl ? " (with poster)" : ""}`);
   return filmId;
 }
@@ -312,12 +441,62 @@ async function tryUpdatePoster(
 
 /**
  * Insert or update a screening
+ * If scraper didn't provide event data and title looks like it needs classification,
+ * use Claude to extract event type, format, and accessibility info
  */
 async function insertScreening(
   filmId: string,
   cinemaId: string,
   screening: RawScreening
 ): Promise<boolean> {
+  // Determine screening metadata - use scraper-provided data or classify
+  let eventType = screening.eventType as any;
+  let eventDescription = screening.eventDescription;
+  let format = screening.format as any;
+  let isSpecialEvent = false;
+  let is3D = false;
+  let hasSubtitles = false;
+  let subtitleLanguage: string | null = null;
+  let hasAudioDescription = false;
+  let isRelaxedScreening = false;
+  let season: string | null = null;
+
+  // If scraper didn't provide event data, try to classify the title
+  const needsClassification =
+    !screening.eventType &&
+    !screening.format &&
+    likelyNeedsClassification(screening.filmTitle);
+
+  if (needsClassification) {
+    try {
+      const classification = await classifyEventCached(screening.filmTitle);
+
+      if (classification.eventTypes.length > 0 || classification.format) {
+        console.log(
+          `[Pipeline] Classified: "${screening.filmTitle}" → ${classification.eventTypes.join(", ") || classification.format || "accessibility"}`
+        );
+      }
+
+      // Apply classification results
+      isSpecialEvent = classification.isSpecialEvent;
+      eventType = classification.eventTypes[0] || null;
+      eventDescription =
+        classification.eventTypes.length > 1
+          ? `Also: ${classification.eventTypes.slice(1).join(", ")}`
+          : classification.eventDescription ?? undefined;
+      format = classification.format || format;
+      is3D = classification.is3D;
+      hasSubtitles = classification.hasSubtitles;
+      subtitleLanguage = classification.subtitleLanguage;
+      hasAudioDescription = classification.hasAudioDescription;
+      isRelaxedScreening = classification.isRelaxedScreening;
+      season = classification.season;
+    } catch (e) {
+      console.warn(`[Pipeline] Event classification failed:`, e);
+      // Continue with scraper-provided data
+    }
+  }
+
   // Check for existing screening (same film, cinema, datetime)
   const existing = await db
     .select()
@@ -336,10 +515,17 @@ async function insertScreening(
     await db
       .update(screenings)
       .set({
-        format: screening.format as any,
+        format,
         screen: screening.screen,
-        eventType: screening.eventType as any,
-        eventDescription: screening.eventDescription,
+        isSpecialEvent,
+        eventType,
+        eventDescription,
+        is3D,
+        hasSubtitles,
+        subtitleLanguage,
+        hasAudioDescription,
+        isRelaxedScreening,
+        season,
         bookingUrl: screening.bookingUrl,
         scrapedAt: new Date(),
         updatedAt: new Date(),
@@ -355,10 +541,17 @@ async function insertScreening(
     filmId,
     cinemaId,
     datetime: screening.datetime,
-    format: screening.format as any,
+    format,
     screen: screening.screen,
-    eventType: screening.eventType as any,
-    eventDescription: screening.eventDescription,
+    isSpecialEvent,
+    eventType,
+    eventDescription,
+    is3D,
+    hasSubtitles,
+    subtitleLanguage,
+    hasAudioDescription,
+    isRelaxedScreening,
+    season,
     bookingUrl: screening.bookingUrl,
     sourceId: screening.sourceId,
     scrapedAt: new Date(),

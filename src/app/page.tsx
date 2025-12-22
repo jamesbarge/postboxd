@@ -1,14 +1,18 @@
 import { db } from "@/db";
 import { screenings, films, cinemas } from "@/db/schema";
 import { eq, gte, lte, and } from "drizzle-orm";
-import { startOfDay, endOfDay, addDays } from "date-fns";
+import { endOfDay, addDays } from "date-fns";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { Header } from "@/components/layout/header";
 
+// Force dynamic rendering to avoid ISR size limits
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   // Fetch a wide date range - filtering happens client-side via the filter store
-  const startDate = startOfDay(new Date());
-  const endDate = endOfDay(addDays(startDate, 30)); // Next 30 days
+  // Use current time (not start of day) to exclude screenings that have already started
+  const now = new Date();
+  const endDate = endOfDay(addDays(now, 30)); // Next 30 days
 
   const allScreenings = await db
     .select({
@@ -42,7 +46,7 @@ export default async function Home() {
     .innerJoin(cinemas, eq(screenings.cinemaId, cinemas.id))
     .where(
       and(
-        gte(screenings.datetime, startDate),
+        gte(screenings.datetime, now),
         lte(screenings.datetime, endDate)
       )
     )
@@ -56,8 +60,8 @@ export default async function Home() {
       {/* Unified Header with Filters */}
       <Header cinemas={allCinemas.map(c => ({ id: c.id, name: c.name, shortName: c.shortName }))} />
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      {/* Main Content - Full Width */}
+      <main className="px-4 sm:px-6 lg:px-8 py-6">
         {/* Calendar View */}
         <CalendarView screenings={allScreenings} />
 

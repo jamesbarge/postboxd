@@ -1,0 +1,89 @@
+name: Weekly Cinema Scrape
+
+on:
+  schedule:
+    # Run every Sunday at 3am UTC (3am or 4am UK time depending on DST)
+    - cron: '0 3 * * 0'
+  workflow_dispatch: # Manual trigger from GitHub UI
+
+env:
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      # Run each scraper individually so failures don't stop the pipeline
+      - name: Scrape BFI
+        continue-on-error: true
+        run: npm run scrape:bfi
+
+      - name: Scrape Prince Charles Cinema
+        continue-on-error: true
+        run: npm run scrape:pcc
+
+      - name: Scrape ICA
+        continue-on-error: true
+        run: npm run scrape:ica
+
+      - name: Scrape Barbican
+        continue-on-error: true
+        run: npm run scrape:barbican
+
+      - name: Scrape Rio
+        continue-on-error: true
+        run: npm run scrape:rio
+
+      - name: Scrape Curzon (all venues)
+        continue-on-error: true
+        run: npm run scrape:curzon
+
+      - name: Scrape Picturehouse (all venues)
+        continue-on-error: true
+        run: npm run scrape:picturehouse
+
+      - name: Scrape Everyman (all venues)
+        continue-on-error: true
+        run: npm run scrape:everyman
+
+      - name: Scrape Genesis
+        continue-on-error: true
+        run: npm run scrape:genesis
+
+      - name: Scrape Peckhamplex
+        continue-on-error: true
+        run: npm run scrape:peckhamplex
+
+      - name: Scrape The Nickel
+        continue-on-error: true
+        run: npm run scrape:nickel
+
+      - name: Scrape Electric
+        continue-on-error: true
+        run: npm run scrape:electric
+
+      - name: Scrape Lexi
+        continue-on-error: true
+        run: npm run scrape:lexi
+
+      - name: Scraping complete
+        run: echo "All scrapers have run. Check individual steps for any failures."
