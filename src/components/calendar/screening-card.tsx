@@ -12,8 +12,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { format } from "date-fns";
 import { cn } from "@/lib/cn";
-import { Button, FormatBadge, EventBadge } from "@/components/ui";
-import { ExternalLink, Heart, Eye } from "lucide-react";
+import { Heart, Eye } from "lucide-react";
 import { useFilmStatus } from "@/stores/film-status";
 import { useState, useEffect } from "react";
 
@@ -44,7 +43,7 @@ interface ScreeningCardProps {
 }
 
 export function ScreeningCard({ screening }: ScreeningCardProps) {
-  const { film, cinema, datetime, format: screeningFormat, eventType } = screening;
+  const { film, cinema, datetime } = screening;
   const time = format(new Date(datetime), "HH:mm");
   const formattedDate = format(new Date(datetime), "EEEE d MMMM");
 
@@ -156,72 +155,28 @@ export function ScreeningCard({ screening }: ScreeningCardProps) {
         </div>
       </Link>
 
-      {/* Content - Below poster */}
-      <div className="flex flex-col flex-1 p-4">
+      {/* Content - Compact below poster */}
+      <Link
+        href={`/film/${film.id}`}
+        className="flex flex-col flex-1 p-2 focus:outline-none"
+      >
         {/* Title */}
-        <Link
-          href={`/film/${film.id}`}
-          className="focus:outline-none focus-visible:underline focus-visible:decoration-accent-gold"
-        >
-          <h3 className="font-display text-base sm:text-lg text-text-primary group-hover:text-accent-gold transition-colors line-clamp-2 leading-tight">
-            {film.title}
-            {film.year && (
-              <span className="text-text-tertiary font-body text-xs ml-1.5">
-                ({film.year})
-              </span>
-            )}
-          </h3>
-        </Link>
+        <h3 className="font-display text-xs sm:text-sm text-text-primary group-hover:text-accent-gold transition-colors line-clamp-1 leading-tight">
+          {film.title}
+          {film.year && (
+            <span className="text-text-tertiary font-body text-[10px] ml-1">
+              ({film.year})
+            </span>
+          )}
+        </h3>
 
         {/* Director */}
         {film.directors.length > 0 && (
-          <p className="text-xs text-text-secondary mt-1 line-clamp-1">
-            {film.directors.slice(0, 2).join(", ")}
+          <p className="text-[10px] text-text-secondary mt-0.5 line-clamp-1">
+            {film.directors[0]}
           </p>
         )}
-
-        {/* Badges - compact row */}
-        {(screeningFormat || eventType || film.runtime) && (
-          <div className="flex flex-wrap items-center gap-1.5 mt-2" role="list" aria-label="Screening details">
-            {screeningFormat && (
-              <span role="listitem">
-                <FormatBadge format={screeningFormat} />
-              </span>
-            )}
-            {eventType && (
-              <span role="listitem">
-                <EventBadge type={eventType} />
-              </span>
-            )}
-            {film.runtime && (
-              <span className="text-xs text-text-tertiary">
-                {film.runtime}m
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Book Button - Full width at bottom */}
-        <div className="mt-auto pt-3">
-          <a
-            href={screening.bookingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full focus:outline-none"
-            aria-label={`Book tickets for ${film.title} at ${cinema.name} (opens in new tab)`}
-          >
-            <Button
-              size="sm"
-              variant="primary"
-              className="w-full justify-center"
-              rightIcon={<ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />}
-            >
-              Book
-              <span className="sr-only"> (opens in new tab)</span>
-            </Button>
-          </a>
-        </div>
-      </div>
+      </Link>
     </article>
   );
 }
