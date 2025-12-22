@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { screenings, films, cinemas } from "@/db/schema";
 import { eq, gte, lte, and } from "drizzle-orm";
 import { endOfDay, addDays } from "date-fns";
-import { CalendarView } from "@/components/calendar/calendar-view";
+import { CalendarViewWithLoader } from "@/components/calendar/calendar-view-loader";
 import { Header } from "@/components/layout/header";
 
 // ISR: Revalidate every 5 minutes for fast cached loads
@@ -10,12 +10,12 @@ import { Header } from "@/components/layout/header";
 export const revalidate = 300;
 
 export default async function Home() {
-  // Fetch a wide date range - filtering happens client-side via the filter store
-  // Use current time (not start of day) to exclude screenings that have already started
+  // Fetch only 7 days initially for fast load
+  // Additional days are loaded on-demand via the API
   const now = new Date();
-  const endDate = endOfDay(addDays(now, 30)); // Next 30 days
+  const endDate = endOfDay(addDays(now, 7)); // Only 7 days initially
 
-  const allScreenings = await db
+  const initialScreenings = await db
     .select({
       id: screenings.id,
       datetime: screenings.datetime,
@@ -51,7 +51,8 @@ export default async function Home() {
         lte(screenings.datetime, endDate)
       )
     )
-    .orderBy(screenings.datetime);
+    .orderBy(screenings.datetime)
+    .limit(300); // Safety cap
 
   // Get cinema count for stats
   const allCinemas = await db.select().from(cinemas);
@@ -63,11 +64,11 @@ export default async function Home() {
 
       {/* Main Content - Full Width */}
       <main className="px-4 sm:px-6 lg:px-8 py-6">
-        {/* Calendar View */}
-        <CalendarView screenings={allScreenings} />
+        {/* Calendar View with Load More */}
+        <CalendarViewWithLoader initialScreenings={initialScreenings} />
 
         {/* Empty State Helper */}
-        {allScreenings.length === 0 && (
+        {initialScreenings.length === 0 && (
           <div className="mt-8 p-6 bg-background-secondary/50 border border-white/5 rounded-lg text-center">
             <p className="text-text-secondary mb-4">
               No screenings yet. Seed some test data to see the calendar in

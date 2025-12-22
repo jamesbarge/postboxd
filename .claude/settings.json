@@ -1,0 +1,12 @@
+{
+  "projectName": "filmcal2",
+  "description": "",
+  "conventions": [],
+  "ignorePatterns": [
+    "node_modules",
+    ".git",
+    "dist",
+    "build",
+    ".env"
+  ]
+}
