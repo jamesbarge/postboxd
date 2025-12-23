@@ -52,7 +52,7 @@ export default async function Home() {
       )
     )
     .orderBy(screenings.datetime)
-    .limit(1500); // Covers ~4-5 days of screenings
+    .limit(1000); // Balance: covers ~3 days while keeping build fast
 
   // Get cinema count for stats
   const allCinemas = await db.select().from(cinemas);
