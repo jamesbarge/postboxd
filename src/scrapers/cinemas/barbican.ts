@@ -139,15 +139,27 @@ export class BarbicanScraper extends BaseScraper {
       // Get venue/screen
       const venue = $instance.find(".instance-listing__venue strong").text().trim();
 
-      // Get booking URL
-      const bookingLink = $instance.find('a[href*="tickets.barbican"]').attr("href") ||
-                         $instance.find('a[href*="choose-seats"]').attr("href");
+      // Get booking URL - check multiple selectors as Barbican uses different formats
+      let bookingLink = $instance.find('a[href*="tickets.barbican"]').attr("href") ||
+                       $instance.find('a[href*="choose-seats"]').attr("href") ||
+                       $instance.find('a[href*="/book/"]').attr("href") ||
+                       $instance.find('a.btn--primary[href]').attr("href");
+
+      // Ensure absolute URL - relative URLs need base URL prepended
+      if (bookingLink && !bookingLink.startsWith("http")) {
+        bookingLink = `${this.config.baseUrl}${bookingLink.startsWith("/") ? "" : "/"}${bookingLink}`;
+      }
+
+      // Validate URL format before using
+      const bookingUrl = bookingLink && bookingLink.startsWith("http")
+        ? bookingLink
+        : `${this.config.baseUrl}/whats-on/event/${nodeId}/performances`;
 
       screenings.push({
         filmTitle: title,
         datetime,
         screen: venue || undefined,
-        bookingUrl: bookingLink || `https://www.barbican.org.uk/whats-on/event/${nodeId}/performances`,
+        bookingUrl,
         sourceId: `barbican-${nodeId}-${datetime.toISOString()}`,
       });
     });

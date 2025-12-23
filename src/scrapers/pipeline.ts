@@ -20,12 +20,15 @@ import {
 } from "@/lib/event-classifier";
 import type { RawScreening } from "./types";
 import { v4 as uuidv4 } from "uuid";
+import { validateScreenings, printValidationSummary } from "./utils/screening-validator";
+import { generateScrapeDiff, printDiffReport, shouldBlockScrape } from "./utils/scrape-diff";
 
 interface PipelineResult {
   cinemaId: string;
   added: number;
   updated: number;
   failed: number;
+  rejected: number;  // Validation failures
   scrapedAt: Date;
 }
 
@@ -74,6 +77,37 @@ export async function processScreenings(
 ): Promise<PipelineResult> {
   console.log(`[Pipeline] Processing ${rawScreenings.length} screenings for ${cinemaId}`);
 
+  // Validate screenings before processing - reject invalid data early
+  const { validScreenings, rejectedScreenings, summary } = validateScreenings(rawScreenings);
+
+  if (rejectedScreenings.length > 0) {
+    console.warn(`[Pipeline] Rejected ${rejectedScreenings.length} invalid screenings`);
+    printValidationSummary(summary);
+  }
+
+  // Use validated screenings for rest of pipeline
+  const screeningsToProcess = validScreenings;
+  console.log(`[Pipeline] ${screeningsToProcess.length} valid screenings to process`);
+
+  // Generate diff report to detect suspicious patterns
+  const diffReport = await generateScrapeDiff(cinemaId, screeningsToProcess);
+  if (diffReport.hasIssues) {
+    printDiffReport(diffReport);
+
+    // Block scrape if it looks like the scraper is broken
+    if (shouldBlockScrape(diffReport)) {
+      console.error(`[Pipeline] BLOCKED: Scrape appears broken - ${diffReport.warnings[0]}`);
+      return {
+        cinemaId,
+        added: 0,
+        updated: 0,
+        failed: rawScreenings.length,
+        rejected: rejectedScreenings.length,
+        scrapedAt: new Date(),
+      };
+    }
+  }
+
   // Initialize film cache for this pipeline run (loads ALL films once)
   filmCache = await initFilmCache();
 
@@ -82,19 +116,20 @@ export async function processScreenings(
     added: 0,
     updated: 0,
     failed: 0,
+    rejected: rejectedScreenings.length,
     scrapedAt: new Date(),
   };
 
   // Extract film titles using AI for event-style names
   // This ensures "Saturday Morning Picture Club: The Muppets Christmas Carol" and
   // "The Muppets Christmas Carol" get grouped together
-  const uniqueRawTitles = [...new Set(rawScreenings.map((s) => s.filmTitle))];
+  const uniqueRawTitles = [...new Set(screeningsToProcess.map((s) => s.filmTitle))];
   console.log(`[Pipeline] Extracting titles from ${uniqueRawTitles.length} unique raw titles`);
   const titleExtractions = await batchExtractTitles(uniqueRawTitles);
 
   // Group screenings by extracted film title
   const screeningsByFilm = new Map<string, RawScreening[]>();
-  for (const screening of rawScreenings) {
+  for (const screening of screeningsToProcess) {
     const extraction = titleExtractions.get(screening.filmTitle);
     // Use AI result if confident, otherwise fall back to regex cleaning
     let cleanTitle = extraction?.filmTitle ?? screening.filmTitle;
