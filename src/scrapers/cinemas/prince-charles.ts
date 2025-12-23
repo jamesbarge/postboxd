@@ -97,11 +97,16 @@ export class PrinceCharlesScraper extends BaseScraper {
   ): RawScreening | null {
     // Get the booking link
     const $bookLink = $li.find("a.film_book_button");
-    const bookingUrl = $bookLink.attr("href");
+    let bookingUrl = $bookLink.attr("href");
 
     // Skip sold out shows (they have class soldfilm_book_button)
     if ($bookLink.hasClass("soldfilm_book_button") || !bookingUrl) {
       return null;
+    }
+
+    // Ensure booking URL is absolute
+    if (!bookingUrl.startsWith("http")) {
+      bookingUrl = `${this.config.baseUrl}${bookingUrl.startsWith("/") ? "" : "/"}${bookingUrl}`;
     }
 
     // Get time from span.time inside the link

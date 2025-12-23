@@ -156,6 +156,13 @@ export class ICAScraper extends BaseScraper {
       }
     }
 
+    // Fallback: get canonical URL if no booking link found
+    const canonicalUrl = $('link[rel="canonical"]').attr("href") ||
+                         $('meta[property="og:url"]').attr("content") || "";
+    const fallbackUrl = canonicalUrl.startsWith("http")
+      ? canonicalUrl
+      : canonicalUrl ? `${this.config.baseUrl}${canonicalUrl}` : `${this.config.baseUrl}/films`;
+
     // Parse each performance in the list
     $(".performance-list .performance").each((_, el) => {
       const $perf = $(el);
@@ -180,7 +187,7 @@ export class ICAScraper extends BaseScraper {
         screenings.push({
           filmTitle: filmInfo.title,
           datetime,
-          bookingUrl: bookingBase || filmInfo.url,
+          bookingUrl: bookingBase || fallbackUrl,
           screen: venue || undefined,
           sourceId: `ica-${filmInfo.title.toLowerCase().replace(/\s+/g, "-")}-${datetime.toISOString()}`,
         });
