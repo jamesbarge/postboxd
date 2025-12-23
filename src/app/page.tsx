@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { screenings, films, cinemas } from "@/db/schema";
 import { eq, gte, lte, and } from "drizzle-orm";
-import { endOfDay, addDays } from "date-fns";
+import { endOfDay, addDays, startOfDay } from "date-fns";
 import { CalendarViewWithLoader } from "@/components/calendar/calendar-view-loader";
 import { Header } from "@/components/layout/header";
 
@@ -47,12 +47,12 @@ export default async function Home() {
     .innerJoin(cinemas, eq(screenings.cinemaId, cinemas.id))
     .where(
       and(
-        gte(screenings.datetime, now),
+        gte(screenings.datetime, startOfDay(now)),
         lte(screenings.datetime, endDate)
       )
     )
     .orderBy(screenings.datetime)
-    .limit(1000); // Balance: covers ~3 days while keeping build fast
+    .limit(3000); // Must cover ~7 days of screenings (holiday periods can have 300+/day)
 
   // Get cinema count for stats
   const allCinemas = await db.select().from(cinemas);

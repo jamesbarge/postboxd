@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       .innerJoin(cinemas, eq(screenings.cinemaId, cinemas.id))
       .where(and(...conditions))
       .orderBy(screenings.datetime)
-      .limit(1500); // Per-week fetch
+      .limit(3000); // Per-week fetch (holiday periods can have 300+/day)
 
     // Filter by repertory if requested
     let filtered = results;
