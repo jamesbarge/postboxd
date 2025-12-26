@@ -119,10 +119,10 @@ export class RioScraper extends BaseScraper {
           // Skip past screenings
           if (datetime < now) continue;
 
-          // Build booking URL
-          const bookingUrl = perf.URL.startsWith("http")
-            ? perf.URL
-            : `${this.config.baseUrl}/${perf.URL}`;
+          // Build booking URL - use film page URL which is stable and shows all showtimes
+          // The performance URL (perf.URL) uses session parameters that expire
+          // The film page URL (WhatsOn?f=eventId) is stable and user-friendly
+          const bookingUrl = `${this.config.baseUrl}/Rio.dll/WhatsOn?f=${event.ID}`;
 
           screenings.push({
             filmTitle: event.Title,
