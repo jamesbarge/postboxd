@@ -2,3 +2,4 @@
 export * from "./cinemas";
 export * from "./films";
 export * from "./screenings";
+export * from "./data-issues";

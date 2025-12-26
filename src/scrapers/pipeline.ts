@@ -4,7 +4,7 @@
  */
 
 import { db } from "@/db";
-import { films, screenings, cinemas } from "@/db/schema";
+import { films, screenings as screeningsTable, cinemas } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { matchFilmToTMDB, getTMDBClient, isRepertoryFilm, getDecade } from "@/lib/tmdb";
 import { getPosterService } from "@/lib/posters";
@@ -22,6 +22,9 @@ import type { RawScreening } from "./types";
 import { v4 as uuidv4 } from "uuid";
 import { validateScreenings, printValidationSummary } from "./utils/screening-validator";
 import { generateScrapeDiff, printDiffReport, shouldBlockScrape } from "./utils/scrape-diff";
+
+// Agent imports - conditionally used when ENABLE_AGENTS=true
+const AGENTS_ENABLED = process.env.ENABLE_AGENTS === "true";
 
 interface PipelineResult {
   cinemaId: string;
@@ -190,7 +193,79 @@ export async function processScreenings(
     `[Pipeline] Complete: ${result.added} added, ${result.updated} updated, ${result.failed} failed`
   );
 
+  // Run agent-based analysis if enabled
+  if (AGENTS_ENABLED && result.added > 0) {
+    try {
+      await runPostScrapeAgents(cinemaId, screeningsToProcess, result);
+    } catch (agentError) {
+      console.warn(`[Pipeline] Agent analysis failed (non-blocking):`, agentError);
+    }
+  }
+
   return result;
+}
+
+/**
+ * Run post-scrape agent analysis
+ * This is optional and won't block the scrape if it fails
+ */
+async function runPostScrapeAgents(
+  cinemaId: string,
+  screenings: RawScreening[],
+  result: PipelineResult
+): Promise<void> {
+  // Dynamically import agents to avoid loading SDK if not needed
+  const { analyzeScraperHealth } = await import("@/agents/scraper-health");
+  const { verifyBookingLinks } = await import("@/agents/link-validator");
+
+  console.log(`[Pipeline] Running agent analysis...`);
+
+  // Sample screenings for agent analysis
+  const samples = screenings.slice(0, 5).map((s) => ({
+    title: s.filmTitle,
+    datetime: s.datetime,
+    bookingUrl: s.bookingUrl,
+  }));
+
+  // Run scraper health check
+  const healthResult = await analyzeScraperHealth(
+    cinemaId,
+    screenings.length,
+    samples
+  );
+
+  if (healthResult.success && healthResult.data) {
+    const report = healthResult.data;
+    if (report.anomalyDetected) {
+      console.warn(`[Agent] Anomaly detected: ${report.warnings.join(", ")}`);
+      // Could store this in data_issues table for review
+    }
+  }
+
+  // Verify a sample of booking links (non-blocking)
+  // Get screening IDs from the database for recently added screenings
+  const recentScreenings = await db
+    .select({ id: screeningsTable.id })
+    .from(screeningsTable)
+    .where(eq(screeningsTable.cinemaId, cinemaId))
+    .orderBy(screeningsTable.scrapedAt)
+    .limit(10);
+
+  if (recentScreenings.length > 0) {
+    const linkResult = await verifyBookingLinks(
+      recentScreenings.map((s) => s.id),
+      { dryRun: false, batchSize: 10 }
+    );
+
+    if (linkResult.success && linkResult.data) {
+      const broken = linkResult.data.filter((r) => r.status === "broken");
+      if (broken.length > 0) {
+        console.warn(`[Agent] Found ${broken.length} broken links`);
+      }
+    }
+  }
+
+  console.log(`[Pipeline] Agent analysis complete`);
 }
 
 /**
@@ -536,12 +611,12 @@ async function insertScreening(
   // (Direct query is more efficient and doesn't have the .limit(100) bug)
   const [duplicate] = await db
     .select()
-    .from(screenings)
+    .from(screeningsTable)
     .where(
       and(
-        eq(screenings.filmId, filmId),
-        eq(screenings.cinemaId, cinemaId),
-        eq(screenings.datetime, screening.datetime)
+        eq(screeningsTable.filmId, filmId),
+        eq(screeningsTable.cinemaId, cinemaId),
+        eq(screeningsTable.datetime, screening.datetime)
       )
     )
     .limit(1);
@@ -549,7 +624,7 @@ async function insertScreening(
   if (duplicate) {
     // Update existing
     await db
-      .update(screenings)
+      .update(screeningsTable)
       .set({
         format,
         screen: screening.screen,
@@ -566,13 +641,13 @@ async function insertScreening(
         scrapedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(screenings.id, duplicate.id));
+      .where(eq(screeningsTable.id, duplicate.id));
 
     return false; // Updated, not added
   }
 
   // Insert new screening
-  await db.insert(screenings).values({
+  await db.insert(screeningsTable).values({
     id: uuidv4(),
     filmId,
     cinemaId,
