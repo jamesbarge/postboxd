@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono, Cormorant } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -39,7 +40,21 @@ export default function RootLayout({
       <body
         className={`${dmSans.variable} ${jetbrainsMono.variable} ${cormorant.variable} antialiased bg-background-primary text-text-primary`}
       >
-        <Providers>{children}</Providers>
+        <ClerkProvider
+          appearance={{
+            variables: {
+              colorPrimary: "#1E3A5F",
+              colorText: "#1A1A1A",
+              colorTextSecondary: "#4A4A4A",
+              colorBackground: "#FFFFFF",
+              colorInputBackground: "#EDE8DD",
+              colorInputText: "#1A1A1A",
+              borderRadius: "0.5rem",
+            },
+          }}
+        >
+          <Providers>{children}</Providers>
+        </ClerkProvider>
         <Analytics />
         <SpeedInsights />
       </body>

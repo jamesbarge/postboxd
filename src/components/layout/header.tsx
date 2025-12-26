@@ -22,7 +22,14 @@ import {
   Sparkles,
   History,
   SlidersHorizontal,
+  User,
 } from "lucide-react";
+import {
+  SignInButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from "@clerk/nextjs";
 import { format, addDays, startOfToday, isSameDay, startOfMonth, endOfMonth } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import { cn } from "@/lib/cn";
@@ -74,6 +81,29 @@ export function Header({ cinemas }: HeaderProps) {
                 label="Settings"
               />
             </Link>
+            {/* Auth UI - only render after hydration to prevent mismatch */}
+            {mounted && (
+              <>
+                <SignedOut>
+                  <SignInButton mode="modal">
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-background-hover">
+                      <User className="w-4 h-4" />
+                      <span className="hidden sm:inline">Sign In</span>
+                    </button>
+                  </SignInButton>
+                </SignedOut>
+                <SignedIn>
+                  <UserButton
+                    afterSignOutUrl="/"
+                    appearance={{
+                      elements: {
+                        avatarBox: "w-8 h-8",
+                      },
+                    }}
+                  />
+                </SignedIn>
+              </>
+            )}
           </div>
         </div>
       </div>
