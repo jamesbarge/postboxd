@@ -5,6 +5,18 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import posthog from "posthog-js";
+
+// Helper to track filter changes
+function trackFilterChange(filterType: string, value: unknown, action: "added" | "removed" | "set" | "cleared") {
+  if (typeof window !== "undefined") {
+    posthog.capture("filter_changed", {
+      filter_type: filterType,
+      value,
+      action,
+    });
+  }
+}
 
 export type TimeOfDay = "morning" | "afternoon" | "evening" | "late_night";
 export type ProgrammingType = "repertory" | "new_release" | "special_event" | "preview";
@@ -81,60 +93,117 @@ export const useFilters = create<FilterState & FilterActions>()(
     (set, get) => ({
       ...initialState,
 
-      setFilmSearch: (search) => set({ filmSearch: search }),
+      setFilmSearch: (search) => {
+        set({ filmSearch: search });
+        if (search.trim()) {
+          trackFilterChange("film_search", search, "set");
+        }
+      },
 
-      toggleCinema: (cinemaId) => set((state) => ({
-        cinemaIds: state.cinemaIds.includes(cinemaId)
-          ? state.cinemaIds.filter((id) => id !== cinemaId)
-          : [...state.cinemaIds, cinemaId],
-      })),
+      toggleCinema: (cinemaId) => set((state) => {
+        const isRemoving = state.cinemaIds.includes(cinemaId);
+        trackFilterChange("cinema", cinemaId, isRemoving ? "removed" : "added");
+        return {
+          cinemaIds: isRemoving
+            ? state.cinemaIds.filter((id) => id !== cinemaId)
+            : [...state.cinemaIds, cinemaId],
+        };
+      }),
 
-      setCinemas: (cinemaIds) => set({ cinemaIds }),
+      setCinemas: (cinemaIds) => {
+        trackFilterChange("cinemas", cinemaIds, "set");
+        set({ cinemaIds });
+      },
 
-      setDateRange: (from, to) => set({ dateFrom: from, dateTo: to }),
+      setDateRange: (from, to) => {
+        trackFilterChange("date_range", { from, to }, "set");
+        set({ dateFrom: from, dateTo: to });
+      },
 
-      setTimeRange: (from, to) => set({ timeFrom: from, timeTo: to }),
+      setTimeRange: (from, to) => {
+        trackFilterChange("time_range", { from, to }, "set");
+        set({ timeFrom: from, timeTo: to });
+      },
 
-      toggleFormat: (format) => set((state) => ({
-        formats: state.formats.includes(format)
-          ? state.formats.filter((f) => f !== format)
-          : [...state.formats, format],
-      })),
+      toggleFormat: (format) => set((state) => {
+        const isRemoving = state.formats.includes(format);
+        trackFilterChange("format", format, isRemoving ? "removed" : "added");
+        return {
+          formats: isRemoving
+            ? state.formats.filter((f) => f !== format)
+            : [...state.formats, format],
+        };
+      }),
 
-      toggleProgrammingType: (type) => set((state) => ({
-        programmingTypes: state.programmingTypes.includes(type)
-          ? state.programmingTypes.filter((t) => t !== type)
-          : [...state.programmingTypes, type],
-      })),
+      toggleProgrammingType: (type) => set((state) => {
+        const isRemoving = state.programmingTypes.includes(type);
+        trackFilterChange("programming_type", type, isRemoving ? "removed" : "added");
+        return {
+          programmingTypes: isRemoving
+            ? state.programmingTypes.filter((t) => t !== type)
+            : [...state.programmingTypes, type],
+        };
+      }),
 
-      setProgrammingTypes: (types) => set({ programmingTypes: types }),
+      setProgrammingTypes: (types) => {
+        trackFilterChange("programming_types", types, "set");
+        set({ programmingTypes: types });
+      },
 
-      toggleDecade: (decade) => set((state) => ({
-        decades: state.decades.includes(decade)
-          ? state.decades.filter((d) => d !== decade)
-          : [...state.decades, decade],
-      })),
+      toggleDecade: (decade) => set((state) => {
+        const isRemoving = state.decades.includes(decade);
+        trackFilterChange("decade", decade, isRemoving ? "removed" : "added");
+        return {
+          decades: isRemoving
+            ? state.decades.filter((d) => d !== decade)
+            : [...state.decades, decade],
+        };
+      }),
 
-      setDecades: (decades) => set({ decades }),
+      setDecades: (decades) => {
+        trackFilterChange("decades", decades, "set");
+        set({ decades });
+      },
 
-      toggleGenre: (genre) => set((state) => ({
-        genres: state.genres.includes(genre)
-          ? state.genres.filter((g) => g !== genre)
-          : [...state.genres, genre],
-      })),
+      toggleGenre: (genre) => set((state) => {
+        const isRemoving = state.genres.includes(genre);
+        trackFilterChange("genre", genre, isRemoving ? "removed" : "added");
+        return {
+          genres: isRemoving
+            ? state.genres.filter((g) => g !== genre)
+            : [...state.genres, genre],
+        };
+      }),
 
-      setGenres: (genres) => set({ genres }),
+      setGenres: (genres) => {
+        trackFilterChange("genres", genres, "set");
+        set({ genres });
+      },
 
-      toggleTimeOfDay: (time) => set((state) => ({
-        timesOfDay: state.timesOfDay.includes(time)
-          ? state.timesOfDay.filter((t) => t !== time)
-          : [...state.timesOfDay, time],
-      })),
+      toggleTimeOfDay: (time) => set((state) => {
+        const isRemoving = state.timesOfDay.includes(time);
+        trackFilterChange("time_of_day", time, isRemoving ? "removed" : "added");
+        return {
+          timesOfDay: isRemoving
+            ? state.timesOfDay.filter((t) => t !== time)
+            : [...state.timesOfDay, time],
+        };
+      }),
 
-      setHideSeen: (hide) => set({ hideSeen: hide }),
-      setHideNotInterested: (hide) => set({ hideNotInterested: hide }),
+      setHideSeen: (hide) => {
+        trackFilterChange("hide_seen", hide, "set");
+        set({ hideSeen: hide });
+      },
 
-      clearAllFilters: () => set(initialState),
+      setHideNotInterested: (hide) => {
+        trackFilterChange("hide_not_interested", hide, "set");
+        set({ hideNotInterested: hide });
+      },
+
+      clearAllFilters: () => {
+        trackFilterChange("all", null, "cleared");
+        set(initialState);
+      },
 
       getActiveFilterCount: () => {
         const state = get();

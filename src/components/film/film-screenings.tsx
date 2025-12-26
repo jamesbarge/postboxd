@@ -3,9 +3,12 @@
  * Shows upcoming screenings for a film, grouped by cinema
  */
 
+"use client";
+
 import { format, isToday, isTomorrow } from "date-fns";
 import { MapPin, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { usePostHog } from "posthog-js/react";
 
 interface Screening {
   id: string;
@@ -26,6 +29,10 @@ interface Screening {
 
 interface FilmScreeningsProps {
   screenings: Screening[];
+  film: {
+    id: string;
+    title: string;
+  };
 }
 
 const formatBadgeColors: Record<string, string> = {
@@ -47,7 +54,23 @@ function formatScreeningDate(date: Date): string {
   return format(date, "EEE d MMM");
 }
 
-export function FilmScreenings({ screenings }: FilmScreeningsProps) {
+export function FilmScreenings({ screenings, film }: FilmScreeningsProps) {
+  const posthog = usePostHog();
+
+  const trackBookingClick = (screening: Screening) => {
+    posthog.capture("booking_link_clicked", {
+      film_id: film.id,
+      film_title: film.title,
+      screening_id: screening.id,
+      screening_time: screening.datetime,
+      cinema_id: screening.cinema.id,
+      cinema_name: screening.cinema.name,
+      format: screening.format,
+      event_type: screening.eventType,
+      booking_url: screening.bookingUrl,
+    });
+  };
+
   if (screenings.length === 0) {
     return (
       <div className="text-center py-12">
@@ -142,6 +165,7 @@ export function FilmScreenings({ screenings }: FilmScreeningsProps) {
                     href={screening.bookingUrl}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => trackBookingClick(screening)}
                     className="shrink-0 px-4 py-2 text-sm font-medium text-text-inverse bg-accent-primary hover:bg-accent-primary-hover rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
                   >
                     Book

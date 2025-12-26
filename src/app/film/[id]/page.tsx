@@ -91,7 +91,7 @@ export default async function FilmPage({ params }: FilmPageProps) {
           </span>
         </h2>
 
-        <FilmScreenings screenings={upcomingScreenings} />
+        <FilmScreenings screenings={upcomingScreenings} film={{ id: filmData.id, title: filmData.title }} />
       </div>
     </div>
   );

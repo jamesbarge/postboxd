@@ -16,6 +16,7 @@ import { Heart, X } from "lucide-react";
 import { useFilmStatus, type FilmStatus } from "@/stores/film-status";
 import { memo } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
+import { usePostHog } from "posthog-js/react";
 
 interface ScreeningCardProps {
   screening: {
@@ -47,6 +48,7 @@ export const ScreeningCard = memo(function ScreeningCard({ screening }: Screenin
   const { film, cinema, datetime } = screening;
   const time = format(new Date(datetime), "HH:mm");
   const formattedDate = format(new Date(datetime), "EEEE d MMMM");
+  const posthog = usePostHog();
 
   // Performance: Use selectors to only subscribe to this specific film's status
   // This prevents all cards from re-rendering when any status changes
@@ -55,6 +57,20 @@ export const ScreeningCard = memo(function ScreeningCard({ screening }: Screenin
   const setStatus = useFilmStatus((state) => state.setStatus);
 
   const mounted = useHydrated();
+
+  // Track screening card clicks
+  const trackCardClick = () => {
+    posthog.capture("screening_card_clicked", {
+      film_id: film.id,
+      film_title: film.title,
+      film_year: film.year,
+      cinema_id: cinema.id,
+      cinema_name: cinema.name,
+      screening_id: screening.id,
+      screening_time: datetime,
+      is_repertory: film.isRepertory,
+    });
+  };
 
   // Apply mounted guard for hydration safety (localStorage not available during SSR)
   const status = mounted ? rawStatus : null;
@@ -65,9 +81,23 @@ export const ScreeningCard = memo(function ScreeningCard({ screening }: Screenin
 
     // Toggle off if already set to this status
     if (status === newStatus) {
+      posthog.capture("film_status_removed", {
+        film_id: film.id,
+        film_title: film.title,
+        previous_status: newStatus,
+      });
       setStatus(film.id, null);
       return;
     }
+
+    // Track status change
+    posthog.capture("film_status_set", {
+      film_id: film.id,
+      film_title: film.title,
+      status: newStatus,
+      cinema_id: cinema.id,
+      cinema_name: cinema.name,
+    });
 
     // Always pass film metadata so it can be displayed in settings/lists
     setStatus(film.id, newStatus, {
@@ -100,6 +130,7 @@ export const ScreeningCard = memo(function ScreeningCard({ screening }: Screenin
           className="absolute inset-0 focus:outline-none"
           tabIndex={-1}
           aria-hidden="true"
+          onClick={trackCardClick}
         >
           {film.posterUrl && !film.posterUrl.includes('poster-placeholder') ? (
             <Image
@@ -168,6 +199,7 @@ export const ScreeningCard = memo(function ScreeningCard({ screening }: Screenin
       <Link
         href={`/film/${film.id}`}
         className="flex flex-col flex-1 p-2 focus:outline-none"
+        onClick={trackCardClick}
       >
         {/* Time and Cinema row */}
         <div className="flex items-center gap-2 mb-1">
