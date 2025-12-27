@@ -8,23 +8,51 @@ import { db } from "@/db";
 import { screenings, films, cinemas } from "@/db/schema";
 import { eq, gte, lte, and, inArray } from "drizzle-orm";
 import { startOfDay, endOfDay, addDays } from "date-fns";
+import { z } from "zod";
 import type { ScreeningFormat } from "@/types/screening";
+
+// Input validation schema
+const querySchema = z.object({
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  cinemas: z.string().max(500).optional(), // comma-separated UUIDs
+  formats: z.string().max(200).optional(),
+  repertory: z.enum(["true", "false"]).optional(),
+});
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
 
-    // Parse filters
-    const startDate = searchParams.get("startDate")
-      ? new Date(searchParams.get("startDate")!)
+    // Validate query parameters
+    const parseResult = querySchema.safeParse({
+      startDate: searchParams.get("startDate") || undefined,
+      endDate: searchParams.get("endDate") || undefined,
+      cinemas: searchParams.get("cinemas") || undefined,
+      formats: searchParams.get("formats") || undefined,
+      repertory: searchParams.get("repertory") || undefined,
+    });
+
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: "Invalid query parameters", details: parseResult.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const params = parseResult.data;
+
+    // Parse filters with validated data
+    const startDate = params.startDate
+      ? new Date(params.startDate)
       : startOfDay(new Date());
-    const endDate = searchParams.get("endDate")
-      ? new Date(searchParams.get("endDate")!)
+    const endDate = params.endDate
+      ? new Date(params.endDate)
       : endOfDay(addDays(new Date(), 14)); // Default: 2 weeks ahead
 
-    const cinemaIds = searchParams.get("cinemas")?.split(",").filter(Boolean);
-    const formats = searchParams.get("formats")?.split(",").filter(Boolean);
-    const isRepertory = searchParams.get("repertory");
+    const cinemaIds = params.cinemas?.split(",").filter(Boolean);
+    const formats = params.formats?.split(",").filter(Boolean);
+    const isRepertory = params.repertory;
 
     // Build query conditions
     const conditions = [

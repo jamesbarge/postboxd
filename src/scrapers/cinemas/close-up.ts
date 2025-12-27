@@ -76,10 +76,6 @@ export class CloseUpCinemaScraper extends BaseScraper {
     return pages;
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
   protected async parsePages(htmlPages: string[]): Promise<RawScreening[]> {
     const screenings: RawScreening[] = [];
     const now = new Date();
@@ -141,13 +137,14 @@ export class CloseUpCinemaScraper extends BaseScraper {
 
   /**
    * Extract screenings from HTML listing blocks
-   * These are in format: "Thu 1 January, 8.15pm: Film Title"
+   * Homepage format: "Thu 1 January, 8.15pm: Film Title" in h2 > a
+   * Search page format: "04:30 pm : Film Title" in a > span
    */
   private extractFromHtml(html: string, now: Date, seenKeys: Set<string>): RawScreening[] {
     const screenings: RawScreening[] = [];
     const $ = cheerio.load(html);
 
-    // Find all screening blocks - they have h2 with date/time and title
+    // 1. Homepage format: h2 with date/time and title
     $(".inner_block_3 h2 a").each((_, el) => {
       const text = $(el).text().trim();
       const href = $(el).attr("href");
@@ -158,11 +155,9 @@ export class CloseUpCinemaScraper extends BaseScraper {
 
       const [, , day, month, hour, minute = "0", ampm, title] = match;
 
-      // Parse the date
       const datetime = this.parseHtmlDateTime(day, month, hour, minute, ampm);
       if (!datetime || datetime < now) return;
 
-      // Build booking URL from href
       const bookingUrl = href ? this.normalizeUrl(href) : null;
       if (!bookingUrl) return;
 
@@ -180,7 +175,91 @@ export class CloseUpCinemaScraper extends BaseScraper {
       });
     });
 
+    // 2. Search page format: "04:30 pm : Film Title" in spans
+    // First, try to find the date from the page (look for date heading)
+    const pageDate = this.extractPageDate(html);
+
+    if (pageDate) {
+      $("a span").each((_, el) => {
+        const text = $(el).text().trim();
+        const href = $(el).parent("a").attr("href");
+
+        // Parse format: "04:30 pm : Film Title" or "08:00 pm : The Liberated Film Club: Jennifer Lucy Allan"
+        const match = text.match(/^(\d{1,2}):(\d{2})\s*(am|pm)\s*:\s*(.+)$/i);
+        if (!match) return;
+
+        const [, hour, minute, ampm, title] = match;
+
+        // Use the page date with the time from the listing
+        const datetime = this.combineDateAndTime(pageDate, hour, minute, ampm);
+        if (!datetime || datetime < now) return;
+
+        const bookingUrl = href ? this.normalizeUrl(href) : null;
+        if (!bookingUrl) return;
+
+        const dedupeKey = `${title.trim().toLowerCase()}-${datetime.toISOString()}`;
+        if (seenKeys.has(dedupeKey)) return;
+
+        seenKeys.add(dedupeKey);
+        const sourceId = `close-up-search-${datetime.toISOString()}-${title.replace(/\s+/g, "-").toLowerCase()}`;
+
+        screenings.push({
+          filmTitle: title.trim(),
+          datetime,
+          bookingUrl,
+          sourceId,
+        });
+      });
+    }
+
     return screenings;
+  }
+
+  /**
+   * Extract the date from a search results page
+   * Look for patterns like "Saturday, 31 January" in the page
+   */
+  private extractPageDate(html: string): Date | null {
+    // Look for date in URL parameter first
+    const urlMatch = html.match(/date=(\d{2})-(\d{2})-(\d{4})/);
+    if (urlMatch) {
+      const [, day, month, year] = urlMatch;
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+
+    // Look for date heading like "Saturday, 31 January"
+    const dateHeadingMatch = html.match(/(\w+),?\s+(\d{1,2})\s+(\w+)\s+(\d{4})?/);
+    if (dateHeadingMatch) {
+      const [, , day, month, year] = dateHeadingMatch;
+      const months: Record<string, number> = {
+        january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+        july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+      };
+      const monthNum = months[month.toLowerCase()];
+      if (monthNum !== undefined) {
+        const yearNum = year ? parseInt(year) : new Date().getFullYear();
+        return new Date(yearNum, monthNum, parseInt(day));
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Combine a date with time components
+   */
+  private combineDateAndTime(date: Date, hour: string, minute: string, ampm: string): Date {
+    let hourNum = parseInt(hour, 10);
+    const minuteNum = parseInt(minute, 10);
+
+    // Convert to 24-hour
+    if (ampm.toLowerCase() === "pm" && hourNum !== 12) {
+      hourNum += 12;
+    } else if (ampm.toLowerCase() === "am" && hourNum === 12) {
+      hourNum = 0;
+    }
+
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate(), hourNum, minuteNum, 0);
   }
 
   /**
