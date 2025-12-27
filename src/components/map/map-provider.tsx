@@ -6,6 +6,7 @@
 "use client";
 
 import { APIProvider } from "@vis.gl/react-google-maps";
+import { useCallback } from "react";
 
 interface MapProviderProps {
   children: React.ReactNode;
@@ -13,6 +14,14 @@ interface MapProviderProps {
 
 export function MapProvider({ children }: MapProviderProps) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  const handleLoad = useCallback(() => {
+    console.log("[MapProvider] Google Maps API loaded successfully");
+  }, []);
+
+  const handleError = useCallback((error: unknown) => {
+    console.error("[MapProvider] Google Maps API failed to load:", error);
+  }, []);
 
   if (!apiKey) {
     return (
@@ -28,7 +37,11 @@ export function MapProvider({ children }: MapProviderProps) {
   }
 
   return (
-    <APIProvider apiKey={apiKey} libraries={["drawing", "geometry"]}>
+    <APIProvider
+      apiKey={apiKey}
+      libraries={["drawing", "geometry"]}
+      onLoad={handleLoad}
+    >
       {children}
     </APIProvider>
   );

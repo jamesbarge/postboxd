@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import {
   Map,
   useMap,
@@ -37,20 +37,49 @@ const DEFAULT_ZOOM = 12;
 
 export function CinemaMap({ cinemas, mapArea, onAreaChange }: CinemaMapProps) {
   const [isDrawing, setIsDrawing] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+  // Measure container size for explicit pixel dimensions
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect();
+      console.log("[CinemaMap] Container size:", rect.width, rect.height);
+      setContainerSize({ width: rect.width, height: rect.height });
+    };
+
+    updateSize();
+
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Only render map when we have valid dimensions
+  const hasValidSize = containerSize.width > 0 && containerSize.height > 0;
 
   return (
-    <div className="relative w-full h-full">
-      <Map
-        defaultCenter={LONDON_CENTER}
-        defaultZoom={DEFAULT_ZOOM}
-        gestureHandling="greedy"
-        disableDefaultUI={false}
-        zoomControl={true}
-        streetViewControl={false}
-        mapTypeControl={false}
-        fullscreenControl={false}
-        className="w-full h-full rounded-xl overflow-hidden"
-      >
+    <div ref={containerRef} className="relative w-full h-full">
+      {hasValidSize ? (
+        <Map
+          defaultCenter={LONDON_CENTER}
+          defaultZoom={DEFAULT_ZOOM}
+          gestureHandling="greedy"
+          disableDefaultUI={false}
+          zoomControl={true}
+          streetViewControl={false}
+          mapTypeControl={false}
+          fullscreenControl={false}
+          style={{
+            width: `${containerSize.width}px`,
+            height: `${containerSize.height}px`,
+            borderRadius: "0.75rem",
+          }}
+        >
         {/* Cinema Markers */}
         {cinemas.map((cinema) => (
           <CinemaMarker
@@ -72,7 +101,12 @@ export function CinemaMap({ cinemas, mapArea, onAreaChange }: CinemaMapProps) {
           }}
           onAreaClear={() => onAreaChange(null)}
         />
-      </Map>
+        </Map>
+      ) : (
+        <div className="flex items-center justify-center h-full bg-background-secondary rounded-xl">
+          <MapPin className="w-8 h-8 text-text-tertiary animate-pulse" />
+        </div>
+      )}
 
       {/* Drawing Controls */}
       <DrawingControls

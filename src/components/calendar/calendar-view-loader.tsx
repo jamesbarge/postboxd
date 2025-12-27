@@ -64,15 +64,23 @@ async function fetchMoreScreenings(startDay: number, endDay: number): Promise<Sc
 }
 
 export function CalendarViewWithLoader({ initialScreenings, cinemas }: CalendarViewWithLoaderProps) {
-  // Track how many weeks we've loaded (starts at 1 = first 7 days from server)
-  const [weeksLoaded, setWeeksLoaded] = useState(1);
-  const maxWeeks = 4; // Up to 4 weeks (28 days)
+  // Track load state (0 = initial 3 days, 1 = week 1 complete, 2-4 = additional weeks)
+  const [loadState, setLoadState] = useState(0);
+  const maxLoadState = 4; // Up to 4 weeks (28 days)
+
+  // Fetch rest of week 1 (days 4-7) - server only sends 3 days for fast initial load
+  const week1RestQuery = useQuery({
+    queryKey: ["screenings", "week1-rest"],
+    queryFn: () => fetchMoreScreenings(3, 7),
+    enabled: loadState >= 1,
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Fetch week 2 (days 8-14)
   const week2Query = useQuery({
     queryKey: ["screenings", "week2"],
     queryFn: () => fetchMoreScreenings(7, 14),
-    enabled: weeksLoaded >= 2,
+    enabled: loadState >= 2,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -80,7 +88,7 @@ export function CalendarViewWithLoader({ initialScreenings, cinemas }: CalendarV
   const week3Query = useQuery({
     queryKey: ["screenings", "week3"],
     queryFn: () => fetchMoreScreenings(14, 21),
-    enabled: weeksLoaded >= 3,
+    enabled: loadState >= 3,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -88,7 +96,7 @@ export function CalendarViewWithLoader({ initialScreenings, cinemas }: CalendarV
   const week4Query = useQuery({
     queryKey: ["screenings", "week4"],
     queryFn: () => fetchMoreScreenings(21, 28),
-    enabled: weeksLoaded >= 4,
+    enabled: loadState >= 4,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -96,6 +104,9 @@ export function CalendarViewWithLoader({ initialScreenings, cinemas }: CalendarV
   const allScreenings = useMemo(() => {
     const screenings = [...initialScreenings];
 
+    if (week1RestQuery.data) {
+      screenings.push(...week1RestQuery.data);
+    }
     if (week2Query.data) {
       screenings.push(...week2Query.data);
     }
@@ -115,23 +126,26 @@ export function CalendarViewWithLoader({ initialScreenings, cinemas }: CalendarV
     return Array.from(uniqueMap.values()).sort(
       (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
     );
-  }, [initialScreenings, week2Query.data, week3Query.data, week4Query.data]);
+  }, [initialScreenings, week1RestQuery.data, week2Query.data, week3Query.data, week4Query.data]);
 
   const isLoading =
-    (weeksLoaded >= 2 && week2Query.isLoading) ||
-    (weeksLoaded >= 3 && week3Query.isLoading) ||
-    (weeksLoaded >= 4 && week4Query.isLoading);
+    (loadState >= 1 && week1RestQuery.isLoading) ||
+    (loadState >= 2 && week2Query.isLoading) ||
+    (loadState >= 3 && week3Query.isLoading) ||
+    (loadState >= 4 && week4Query.isLoading);
 
-  const canLoadMore = weeksLoaded < maxWeeks;
+  const canLoadMore = loadState < maxLoadState;
 
   const handleLoadMore = () => {
     if (canLoadMore) {
-      setWeeksLoaded((w) => w + 1);
+      setLoadState((s) => s + 1);
     }
   };
 
   // Calculate what date range we're showing
-  const endDate = addDays(new Date(), weeksLoaded * 7);
+  // loadState 0 = 3 days, 1 = 7 days, 2 = 14 days, etc.
+  const daysShowing = loadState === 0 ? 3 : loadState * 7;
+  const endDate = addDays(new Date(), daysShowing);
   const dateLabel = format(endDate, "d MMMM");
 
   return (

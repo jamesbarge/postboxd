@@ -11,10 +11,11 @@ import { Header } from "@/components/layout/header";
 export const dynamic = "force-dynamic";
 
 // Cache screenings query for 60 seconds (keyed by date to bust cache at midnight)
+// Only load 3 days initially (~500 screenings) - more loaded via client-side
 const getCachedScreenings = unstable_cache(
   async (dateKey: string) => {
     const now = new Date();
-    const endDate = endOfDay(addDays(now, 7));
+    const endDate = endOfDay(addDays(now, 3)); // 3 days instead of 7
 
     return db
       .select({
@@ -53,9 +54,9 @@ const getCachedScreenings = unstable_cache(
         )
       )
       .orderBy(screenings.datetime)
-      .limit(3000);
+      .limit(800); // Cap at 800 for fast initial load
   },
-  ["home-screenings"],
+  ["home-screenings-v2"], // New cache key
   { revalidate: 60, tags: ["screenings"] }
 );
 
