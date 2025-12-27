@@ -15,6 +15,9 @@ import { EmptyState } from "@/components/ui";
 import { Button } from "@/components/ui";
 import { Film, Search } from "lucide-react";
 
+// Stable reference for empty set (prevents unnecessary re-renders)
+const EMPTY_SET = new Set<string>();
+
 interface Screening {
   id: string;
   datetime: Date;
@@ -48,9 +51,28 @@ interface CalendarViewProps {
 
 export function CalendarView({ screenings }: CalendarViewProps) {
   const filters = useFilters();
-  // Subscribe to films object so useMemo recomputes when any status changes
-  const films = useFilmStatus((state) => state.films);
   const mounted = useHydrated();
+
+  // Optimized selector: Only subscribe to hidden film IDs when hide filters are active
+  // This prevents re-renders when film statuses change but hide filters are off
+  const hiddenFilmIds = useFilmStatus((state) => {
+    // If no hide filters are active, return empty set (stable reference)
+    if (!filters.hideSeen && !filters.hideNotInterested) {
+      return EMPTY_SET;
+    }
+
+    // Build set of film IDs that should be hidden
+    const hidden = new Set<string>();
+    for (const [filmId, entry] of Object.entries(state.films)) {
+      if (filters.hideSeen && entry.status === "seen") {
+        hidden.add(filmId);
+      }
+      if (filters.hideNotInterested && entry.status === "not_interested") {
+        hidden.add(filmId);
+      }
+    }
+    return hidden;
+  });
 
   // Apply all filters (only after mount)
   const filteredScreenings = useMemo(() => {
@@ -152,16 +174,14 @@ export function CalendarView({ screenings }: CalendarViewProps) {
         }
       }
 
-      // Personal status filters
-      if (filters.hideSeen || filters.hideNotInterested) {
-        const status = films[s.film.id]?.status ?? null;
-        if (filters.hideSeen && status === "seen") return false;
-        if (filters.hideNotInterested && status === "not_interested") return false;
+      // Personal status filters (use pre-computed hidden set for performance)
+      if (hiddenFilmIds.has(s.film.id)) {
+        return false;
       }
 
       return true;
     });
-  }, [screenings, filters, films, mounted]);
+  }, [screenings, filters, hiddenFilmIds, mounted]);
 
   const activeFilterCount = mounted ? filters.getActiveFilterCount() : 0;
 

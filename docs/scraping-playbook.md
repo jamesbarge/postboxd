@@ -19,6 +19,7 @@ This document describes how each cinema website is scraped, including the approa
 | **Nickel** | page.evaluate | Playwright | `book.thenickel.co.uk` | Working |
 | **Everyman** | Date tabs | Playwright | `/venues-list/{code}-everyman-{slug}/` | Working |
 | **Lexi** | Single page | Playwright | `/TheLexiCinema.dll/Home` | Broken |
+| **Garden Cinema** | Single page | No | `thegardencinema.co.uk` homepage | Working |
 
 ---
 
@@ -218,6 +219,42 @@ west_norwood: 10099, ealing: 10107
 **URL Pattern:** `/TheLexiCinema.dll/Home`
 
 **Known Issue:** Film cards found but date text extraction fails
+
+---
+
+### 13. Garden Cinema
+
+**File:** `src/scrapers/cinemas/garden.ts`
+
+**Approach:**
+- Single page fetch from homepage
+- No browser needed - HTML is static
+- All screening data organized by date blocks on the homepage
+- Extracts director and year from stats string
+
+**Date Format:**
+- Date: `data-date="YYYY-MM-DD"` attribute on date blocks
+- Time: `"11:00"`, `"17:45"` - already in 24-hour format
+
+**Key Selectors:**
+- Date blocks: `.date-block[data-date]`
+- Film cards: `.films-list__by-date__film`
+- Title: `.films-list__by-date__film__title a`
+- Rating (e.g., "U", "12A"): `.films-list__by-date__film__rating`
+- Stats (director, year): `.films-list__by-date__film__stats`
+- Screening times: `a.screening`
+
+**Stats Format:** `"Director, Country, Year, Runtime"`
+- Example: `"Greta Gerwig, USA, 2019, 135m."`
+- Parser extracts director (first comma-separated value) and year
+
+**URL Pattern:** Homepage only - `https://thegardencinema.co.uk`
+
+**Notes:**
+- Single-screen independent cinema in North London (Golders Green)
+- Very clean data structure with well-labeled CSS classes
+- Rating appears inside the title link and needs to be stripped
+- All times are in 24-hour format, no AM/PM parsing needed
 
 ---
 

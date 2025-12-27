@@ -63,10 +63,11 @@ export const screenings = pgTable(
       .defaultNow(),
 
     // Link verification (populated by agents)
-    linkStatus: text("link_status").$type<
-      "verified" | "broken" | "redirect" | "sold_out" | "wrong_film" | "unchecked"
-    >(),
-    linkLastChecked: timestamp("link_last_checked", { withTimezone: true }),
+    // TODO: Add these columns via Neon console - ALTER TABLE times out on serverless
+    // linkStatus: text("link_status").$type<
+    //   "verified" | "broken" | "redirect" | "sold_out" | "wrong_film" | "unchecked"
+    // >(),
+    // linkLastChecked: timestamp("link_last_checked", { withTimezone: true }),
   },
   (table) => [
     // Indexes for common query patterns

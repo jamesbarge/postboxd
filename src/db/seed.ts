@@ -155,6 +155,27 @@ const londonCinemas = [
     description:
       "Independent East London cinema with an eclectic mix of mainstream, arthouse, and repertory programming.",
   },
+  {
+    id: "garden-cinema",
+    name: "The Garden Cinema",
+    shortName: "Garden",
+    chain: null,
+    address: {
+      street: "39-41 Golders Green Road",
+      area: "Golders Green",
+      postcode: "NW11 8EE",
+      borough: "Barnet",
+    },
+    coordinates: { lat: 51.5726, lng: -0.1944 },
+    screens: 1,
+    features: ["bar", "accessible", "35mm"],
+    programmingFocus: ["arthouse", "repertory", "documentary"],
+    website: "https://thegardencinema.co.uk",
+    bookingUrl: "https://thegardencinema.co.uk",
+    dataSourceType: "scrape" as const,
+    description:
+      "A beautiful single-screen independent cinema in North London. Thoughtfully curated programming with a focus on repertory, arthouse, and special events.",
+  },
 ];
 
 async function seed() {

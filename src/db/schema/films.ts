@@ -6,8 +6,8 @@ import {
   timestamp,
   jsonb,
   real,
+  index,
   // vector,
-  // index,
 } from "drizzle-orm/pg-core";
 import type { CastMember, ReleaseStatus } from "@/types/film";
 
@@ -71,7 +71,14 @@ export const films = pgTable("films", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}, (table) => [
+  // Index for ILIKE search queries on title
+  index("idx_films_title").on(table.title),
+  // Index for filtering by repertory status
+  index("idx_films_repertory").on(table.isRepertory),
+  // Index for decade/year filtering
+  index("idx_films_year").on(table.year),
+]);
 
 export type FilmInsert = typeof films.$inferInsert;
 export type FilmSelect = typeof films.$inferSelect;

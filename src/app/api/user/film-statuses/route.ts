@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { userFilmStatuses } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth";
 
 /**
@@ -48,6 +48,10 @@ interface FilmStatusPayload {
 /**
  * POST /api/user/film-statuses - Bulk upsert film statuses
  * Used for syncing local state to server
+ *
+ * Optimized: Uses batch fetch + conditional upsert instead of N+1 queries
+ * Before: 2N queries (check + update/insert per status)
+ * After: 2 queries (fetch all existing + batch upsert)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -55,65 +59,81 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { statuses } = body as { statuses: FilmStatusPayload[] };
 
-    if (!Array.isArray(statuses)) {
+    if (!Array.isArray(statuses) || statuses.length === 0) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    // Process each status
-    const results = await Promise.all(
-      statuses.map(async (status) => {
-        // Check if entry exists
-        const existing = await db.query.userFilmStatuses.findFirst({
-          where: (table, { and, eq }) =>
-            and(eq(table.userId, userId), eq(table.filmId, status.filmId)),
-        });
+    // 1. Fetch all existing statuses for this user in ONE query
+    const existingStatuses = await db.query.userFilmStatuses.findMany({
+      where: eq(userFilmStatuses.userId, userId),
+    });
 
-        if (existing) {
-          // Compare timestamps - only update if incoming is newer
-          const existingTime = new Date(existing.updatedAt).getTime();
-          const incomingTime = new Date(status.updatedAt).getTime();
-
-          if (incomingTime > existingTime) {
-            // Update existing
-            await db
-              .update(userFilmStatuses)
-              .set({
-                status: status.status,
-                addedAt: new Date(status.addedAt),
-                seenAt: status.seenAt ? new Date(status.seenAt) : null,
-                rating: status.rating,
-                notes: status.notes,
-                filmTitle: status.filmTitle,
-                filmYear: status.filmYear,
-                filmDirectors: status.filmDirectors,
-                filmPosterUrl: status.filmPosterUrl,
-                updatedAt: new Date(status.updatedAt),
-              })
-              .where(eq(userFilmStatuses.id, existing.id));
-          }
-          return { filmId: status.filmId, action: "updated" };
-        } else {
-          // Insert new
-          await db.insert(userFilmStatuses).values({
-            userId,
-            filmId: status.filmId,
-            status: status.status,
-            addedAt: new Date(status.addedAt),
-            seenAt: status.seenAt ? new Date(status.seenAt) : null,
-            rating: status.rating,
-            notes: status.notes,
-            filmTitle: status.filmTitle,
-            filmYear: status.filmYear,
-            filmDirectors: status.filmDirectors,
-            filmPosterUrl: status.filmPosterUrl,
-            updatedAt: new Date(status.updatedAt),
-          });
-          return { filmId: status.filmId, action: "created" };
-        }
-      })
+    // Build a map for O(1) lookups
+    const existingMap = new Map(
+      existingStatuses.map((s) => [s.filmId, s])
     );
 
-    return NextResponse.json({ success: true, results });
+    // 2. Filter statuses to only those that need updating (incoming is newer)
+    const toUpsert = statuses.filter((status) => {
+      const existing = existingMap.get(status.filmId);
+      if (!existing) return true; // New entry, always insert
+
+      // Only update if incoming timestamp is newer
+      const existingTime = new Date(existing.updatedAt).getTime();
+      const incomingTime = new Date(status.updatedAt).getTime();
+      return incomingTime > existingTime;
+    });
+
+    if (toUpsert.length === 0) {
+      return NextResponse.json({
+        success: true,
+        results: { processed: 0, skipped: statuses.length }
+      });
+    }
+
+    // 3. Batch upsert using ON CONFLICT DO UPDATE
+    // This handles both inserts and updates in a single query
+    await db
+      .insert(userFilmStatuses)
+      .values(
+        toUpsert.map((status) => ({
+          userId,
+          filmId: status.filmId,
+          status: status.status,
+          addedAt: new Date(status.addedAt),
+          seenAt: status.seenAt ? new Date(status.seenAt) : null,
+          rating: status.rating ?? null,
+          notes: status.notes ?? null,
+          filmTitle: status.filmTitle ?? null,
+          filmYear: status.filmYear ?? null,
+          filmDirectors: status.filmDirectors ?? null,
+          filmPosterUrl: status.filmPosterUrl ?? null,
+          updatedAt: new Date(status.updatedAt),
+        }))
+      )
+      .onConflictDoUpdate({
+        target: [userFilmStatuses.userId, userFilmStatuses.filmId],
+        set: {
+          status: sql`excluded.status`,
+          addedAt: sql`excluded.added_at`,
+          seenAt: sql`excluded.seen_at`,
+          rating: sql`excluded.rating`,
+          notes: sql`excluded.notes`,
+          filmTitle: sql`excluded.film_title`,
+          filmYear: sql`excluded.film_year`,
+          filmDirectors: sql`excluded.film_directors`,
+          filmPosterUrl: sql`excluded.film_poster_url`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+      });
+
+    return NextResponse.json({
+      success: true,
+      results: {
+        processed: toUpsert.length,
+        skipped: statuses.length - toUpsert.length
+      }
+    });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return unauthorizedResponse();
