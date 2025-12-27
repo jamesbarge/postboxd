@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { addDays, format } from "date-fns";
+import { addDays, format, differenceInDays, startOfDay } from "date-fns";
 import { CalendarView } from "./calendar-view";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Loader2, ChevronDown } from "lucide-react";
+import { useFilters } from "@/stores/filters";
 
 interface Screening {
   id: string;
@@ -67,6 +68,37 @@ export function CalendarViewWithLoader({ initialScreenings, cinemas }: CalendarV
   // Track load state (0 = initial 3 days, 1 = week 1 complete, 2-4 = additional weeks)
   const [loadState, setLoadState] = useState(0);
   const maxLoadState = 4; // Up to 4 weeks (28 days)
+
+  // Get date filter from store to auto-load when user selects future dates
+  const dateTo = useFilters((state) => state.dateTo);
+
+  // Auto-load more weeks when dateTo extends beyond currently loaded data
+  useEffect(() => {
+    if (!dateTo) return;
+
+    const today = startOfDay(new Date());
+    const daysUntilDateTo = differenceInDays(startOfDay(dateTo), today);
+
+    // Calculate required loadState based on days needed
+    // loadState 0 = 3 days, 1 = 7 days, 2 = 14 days, 3 = 21 days, 4 = 28 days
+    let requiredState: number;
+    if (daysUntilDateTo <= 3) {
+      requiredState = 0;
+    } else if (daysUntilDateTo <= 7) {
+      requiredState = 1;
+    } else if (daysUntilDateTo <= 14) {
+      requiredState = 2;
+    } else if (daysUntilDateTo <= 21) {
+      requiredState = 3;
+    } else {
+      requiredState = 4;
+    }
+
+    // Only increase loadState, never decrease (user might have manually loaded more)
+    if (requiredState > loadState && requiredState <= maxLoadState) {
+      setLoadState(requiredState);
+    }
+  }, [dateTo, loadState, maxLoadState]);
 
   // Fetch rest of week 1 (days 4-7) - server only sends 3 days for fast initial load
   const week1RestQuery = useQuery({

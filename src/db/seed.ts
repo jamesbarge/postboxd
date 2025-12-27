@@ -197,6 +197,27 @@ const londonCinemas = [
     description:
       "An intimate single-screen cinema in Shoreditch specializing in repertory programming, filmmaker retrospectives, and curated seasons. Known for its thoughtful curation and community events.",
   },
+  {
+    id: "cine-lumiere",
+    name: "Cine Lumiere",
+    shortName: "Lumiere",
+    chain: null,
+    address: {
+      street: "17 Queensberry Place",
+      area: "South Kensington",
+      postcode: "SW7 2DT",
+      borough: "Kensington and Chelsea",
+    },
+    coordinates: { lat: 51.4947, lng: -0.1765 },
+    screens: 1,
+    features: ["accessible", "bar"],
+    programmingFocus: ["arthouse", "repertory", "french", "european"],
+    website: "https://www.institut-francais.org.uk/cine-lumiere/",
+    bookingUrl: "https://cinelumiere.savoysystems.co.uk/CineLumiere.dll/",
+    dataSourceType: "scrape" as const,
+    description:
+      "The cinema at Institut Francais in South Kensington. Specializes in French and European arthouse cinema, classic repertory screenings, and cultural film events.",
+  },
 ];
 
 async function seed() {

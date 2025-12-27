@@ -35,10 +35,63 @@ interface CinemaMapProps {
 const LONDON_CENTER = { lat: 51.5074, lng: -0.1278 };
 const DEFAULT_ZOOM = 12;
 
+/**
+ * MapTilesFixer - Workaround for Google Maps tiles not rendering in dev mode
+ *
+ * In Turbopack dev environment, there's a race condition where map tiles download
+ * but don't render until a significant resize occurs. Programmatic resize events
+ * are ignored by Google Maps, but actual DOM size changes trigger re-rendering.
+ *
+ * This fix works by briefly changing the map container's actual pixel dimensions,
+ * which forces Google Maps to recalculate and render the tiles.
+ */
+function MapTilesFixer() {
+  const map = useMap();
+  const hasTriggered = useRef(false);
+
+  useEffect(() => {
+    if (!map || hasTriggered.current) return;
+
+    const triggerMapRefresh = () => {
+      if (hasTriggered.current) return;
+      hasTriggered.current = true;
+
+      // Find the map's DOM container and resize it
+      const mapDiv = (map as unknown as { getDiv?: () => HTMLElement }).getDiv?.();
+      if (mapDiv) {
+        const originalWidth = mapDiv.style.width;
+        const originalHeight = mapDiv.style.height;
+
+        // Shrink by significant amount to trigger tile recalculation
+        const currentWidth = mapDiv.offsetWidth;
+        mapDiv.style.width = `${currentWidth - 100}px`;
+
+        // Force reflow
+        void mapDiv.offsetHeight;
+
+        // Restore after a frame
+        requestAnimationFrame(() => {
+          mapDiv.style.width = originalWidth;
+          console.log("[MapTilesFixer] Triggered tile refresh via DOM resize");
+        });
+      }
+    };
+
+    // Wait for map to be fully initialized
+    const timer = setTimeout(triggerMapRefresh, 500);
+    return () => clearTimeout(timer);
+  }, [map]);
+
+  return null;
+}
+
 export function CinemaMap({ cinemas, mapArea, onAreaChange }: CinemaMapProps) {
   const [isDrawing, setIsDrawing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  // Force map remount after initial render to fix tile rendering in dev mode
+  const [mapKey, setMapKey] = useState(0);
+  const hasRemounted = useRef(false);
 
   // Measure container size for explicit pixel dimensions
   useEffect(() => {
@@ -59,6 +112,22 @@ export function CinemaMap({ cinemas, mapArea, onAreaChange }: CinemaMapProps) {
     return () => observer.disconnect();
   }, []);
 
+  // Force map remount after initial render to fix tile rendering in Turbopack dev mode
+  // This is a workaround for a race condition where tiles download but don't render
+  useEffect(() => {
+    if (hasRemounted.current || !containerSize.width) return;
+
+    const timer = setTimeout(() => {
+      if (!hasRemounted.current) {
+        hasRemounted.current = true;
+        setMapKey((k) => k + 1);
+        console.log("[CinemaMap] Forcing map remount to fix tiles");
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [containerSize.width]);
+
   // Only render map when we have valid dimensions
   const hasValidSize = containerSize.width > 0 && containerSize.height > 0;
 
@@ -66,6 +135,7 @@ export function CinemaMap({ cinemas, mapArea, onAreaChange }: CinemaMapProps) {
     <div ref={containerRef} className="relative w-full h-full">
       {hasValidSize ? (
         <Map
+          key={mapKey}
           defaultCenter={LONDON_CENTER}
           defaultZoom={DEFAULT_ZOOM}
           gestureHandling="greedy"
@@ -80,6 +150,9 @@ export function CinemaMap({ cinemas, mapArea, onAreaChange }: CinemaMapProps) {
             borderRadius: "0.75rem",
           }}
         >
+        {/* Workaround for tile rendering in dev mode */}
+        <MapTilesFixer />
+
         {/* Cinema Markers */}
         {cinemas.map((cinema) => (
           <CinemaMarker

@@ -21,6 +21,7 @@ This document describes how each cinema website is scraped, including the approa
 | **Lexi** | Single page | Playwright | `/TheLexiCinema.dll/Home` | Broken |
 | **Garden Cinema** | Single page | No | `thegardencinema.co.uk` homepage | Working |
 | **Close-Up Cinema** | Embedded JSON | No | `closeupfilmcentre.com` homepage | Working |
+| **Cine Lumiere** | Single page | No | `cinelumiere.savoysystems.co.uk/CineLumiere.dll/` | Working |
 
 ---
 
@@ -301,6 +302,42 @@ west_norwood: 10099, ealing: 10107
 - Simple data structure - single-screen venue
 - All times in 24-hour format
 - Booking handled via TicketSource
+
+---
+
+### 15. Cine Lumiere (Institut Francais)
+
+**File:** `src/scrapers/cinemas/cine-lumiere.ts`
+
+**Approach:**
+- Single page fetch from Savoy Systems booking page
+- No browser needed - HTML is static
+- Parses film blocks with dates and time links
+- Uses Savoy Systems `.dll` booking platform
+
+**Date Format:**
+- Date: `"Friday 6 Mar 2026"` (Day DD Mon YYYY)
+- Time: `"16:00"`, `"18:15"` - already in 24-hour format
+
+**Key Selectors:**
+- Film links: `a[href*="TcsProgramme_"]`
+- Time links: `a` elements with `/^\d{1,2}:\d{2}$/` pattern
+- Date text: Lines matching `/(Monday|Tuesday|...|Sunday)\s+\d{1,2}\s+\w+\s*\d*/`
+
+**Booking URLs:**
+- Base: `https://cinelumiere.savoysystems.co.uk/CineLumiere.dll/`
+- Performance links contain `TcsPerformance_` identifiers
+
+**URL Pattern:** Single page - `https://cinelumiere.savoysystems.co.uk/CineLumiere.dll/`
+
+**Notes:**
+- Arthouse cinema at Institut Francais in South Kensington
+- Specializes in French and European cinema
+- Savoy Systems is a common UK cinema booking platform (also used by Lexi)
+- Clean 24-hour time format - no AM/PM parsing needed
+- Certificate ratings (15, 12A, etc.) stripped from film titles
+- Some performances show "(Closed for Booking)" status - these are skipped
+- Timezone: Times are in UK local time (GMT/BST). Running scrapers from non-UK timezone machines may cause 1-hour offset; production runs should use UK timezone
 
 ---
 

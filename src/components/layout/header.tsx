@@ -23,6 +23,7 @@ import {
   History,
   SlidersHorizontal,
   User,
+  Navigation,
 } from "lucide-react";
 import {
   SignInButton,
@@ -67,6 +68,14 @@ export function Header({ cinemas }: HeaderProps) {
 
           {/* Navigation Icons */}
           <div className="flex items-center gap-1">
+            <Link href="/reachable" title="What Can I Catch?">
+              <IconButton
+                variant="ghost"
+                size="sm"
+                icon={<Navigation className="w-5 h-5" />}
+                label="What Can I Catch?"
+              />
+            </Link>
             <Link href="/watchlist">
               <IconButton
                 variant="ghost"
@@ -260,16 +269,16 @@ function ActiveFilterChips({ cinemas }: { cinemas: Cinema[] }) {
     });
   }
 
-  // Cinema chips
-  filters.cinemaIds.forEach((id) => {
-    const cinema = cinemas.find((c) => c.id === id);
-    if (cinema) {
-      chips.push({
-        label: cinema.shortName || cinema.name,
-        onRemove: () => filters.toggleCinema(id),
-      });
-    }
-  });
+  // Cinema chip (single chip for all selected cinemas)
+  if (filters.cinemaIds.length > 0) {
+    const count = filters.cinemaIds.length;
+    chips.push({
+      label: count === 1
+        ? cinemas.find(c => c.id === filters.cinemaIds[0])?.shortName || "1 Cinema"
+        : `${count} Cinemas`,
+      onRemove: () => filters.setCinemas([]),
+    });
+  }
 
   if (chips.length === 0) return null;
 
@@ -1076,15 +1085,21 @@ function MapFilterButton({ mounted }: { mounted: boolean }) {
 // Clear All Filters Button
 function ClearFiltersButton({ fullWidth }: { fullWidth?: boolean } = {}) {
   const { getActiveFilterCount, clearAllFilters } = useFilters();
+  const { clearMapArea } = usePreferences();
   const count = getActiveFilterCount();
 
   if (count === 0) return null;
+
+  const handleClear = () => {
+    clearAllFilters();
+    clearMapArea(); // Also clear map polygon when clearing all filters
+  };
 
   return (
     <Button
       variant="ghost"
       size="sm"
-      onClick={clearAllFilters}
+      onClick={handleClear}
       leftIcon={<X className="w-4 h-4" />}
       className={fullWidth ? "w-full justify-center" : undefined}
     >

@@ -236,7 +236,8 @@ export const useFilters = create<FilterState & FilterActions>()(
         const state = get();
         let count = 0;
         if (state.filmSearch.trim()) count++;
-        count += state.cinemaIds.length;
+        // Count cinema selection as 1 filter (not N for N cinemas)
+        if (state.cinemaIds.length > 0) count++;
         if (state.dateFrom || state.dateTo) count++;
         if (state.timeFrom !== null || state.timeTo !== null) count++;
         count += state.formats.length;

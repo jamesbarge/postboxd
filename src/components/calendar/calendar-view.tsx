@@ -15,7 +15,7 @@ import { useHydrated } from "@/hooks/useHydrated";
 import { EmptyState } from "@/components/ui";
 import { Button } from "@/components/ui";
 import { Film, Search, MapPin } from "lucide-react";
-import { isCinemaInArea, type MapArea } from "@/lib/geo-utils";
+// Map area is now synced to cinemaIds by map-page-client, no direct geo filtering here
 
 // Stable reference for empty set (prevents unnecessary re-renders)
 const EMPTY_SET = new Set<string>();
@@ -61,7 +61,7 @@ interface CalendarViewProps {
 
 export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
   const filters = useFilters();
-  const { mapArea, useMapFiltering } = usePreferences();
+  const { mapArea } = usePreferences();
   const mounted = useHydrated();
 
   // Get hide filter values separately for stable selector
@@ -91,21 +91,6 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
     return hidden;
   }, [allFilmStatuses, hideSeen, hideNotInterested]);
 
-  // Compute cinema IDs within map area (when map filtering is active)
-  const mapFilteredCinemaIds = useMemo(() => {
-    if (!mounted || !useMapFiltering || !mapArea) {
-      return null; // null means no map filtering
-    }
-
-    const validIds = new Set<string>();
-    for (const cinema of cinemas) {
-      if (cinema.coordinates && isCinemaInArea(cinema.coordinates, mapArea)) {
-        validIds.add(cinema.id);
-      }
-    }
-    return validIds;
-  }, [mounted, useMapFiltering, mapArea, cinemas]);
-
   // Apply all filters (only after mount)
   const filteredScreenings = useMemo(() => {
     // Before mount, show all screenings
@@ -128,13 +113,8 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
         }
       }
 
-      // Cinema filter
+      // Cinema filter (includes map area selection - cinemaIds is set by map page)
       if (filters.cinemaIds.length > 0 && !filters.cinemaIds.includes(s.cinema.id)) {
-        return false;
-      }
-
-      // Map area filter (only when map filtering is active)
-      if (mapFilteredCinemaIds !== null && !mapFilteredCinemaIds.has(s.cinema.id)) {
         return false;
       }
 
@@ -224,7 +204,7 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
 
       return true;
     });
-  }, [screenings, filters, hiddenFilmIds, mapFilteredCinemaIds, mounted]);
+  }, [screenings, filters, hiddenFilmIds, mounted]);
 
   const activeFilterCount = mounted ? filters.getActiveFilterCount() : 0;
 
@@ -250,7 +230,8 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
     );
   }, [filteredScreenings]);
 
-  const hasMapFilter = mounted && useMapFiltering && mapArea !== null;
+  // Map filter is active if user drew an area on the map (synced to cinemaIds)
+  const hasMapFilter = mounted && mapArea !== null;
 
   if (filteredScreenings.length === 0) {
     return (
