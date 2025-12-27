@@ -615,7 +615,7 @@ Blended LTV = (0.7 × £33.75) + (0.3 × £52.65) = £39.42
 | | | |
 | **Costs** | | |
 | Payment processing | (£120) | ~4.4% blended |
-| Hosting/Infrastructure | (£50) | Vercel, Neon, etc. |
+| Hosting/Infrastructure | (£50) | Vercel, Supabase, etc. |
 | Paid acquisition | (£700) | ~200 new subs × £3.50 |
 | **Total Costs** | **(£870)** | |
 | | | |

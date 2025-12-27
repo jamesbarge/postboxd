@@ -63,7 +63,7 @@ export const screenings = pgTable(
       .defaultNow(),
 
     // Link verification (populated by agents)
-    // TODO: Add these columns via Neon console - ALTER TABLE times out on serverless
+    // TODO: Add these columns via Supabase console - ALTER TABLE times out on serverless
     // linkStatus: text("link_status").$type<
     //   "verified" | "broken" | "redirect" | "sold_out" | "wrong_film" | "unchecked"
     // >(),

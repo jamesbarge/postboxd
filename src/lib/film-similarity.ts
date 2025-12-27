@@ -179,7 +179,7 @@ export async function findMatchingFilm(
  * (Always true now since we use pg_trgm which doesn't need external API)
  */
 export function isSimilarityConfigured(): boolean {
-  return true; // pg_trgm is always available in Neon
+  return true; // pg_trgm is always available in Supabase
 }
 
 /**
