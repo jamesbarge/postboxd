@@ -41,13 +41,19 @@ interface PipelineResult {
 type FilmRecord = typeof films.$inferSelect;
 let filmCache: Map<string, FilmRecord> | null = null;
 
+// Track cache stats for logging
+let cacheStats = { hits: 0, misses: 0, dbQueries: 0 };
+
 /**
- * Initialize or refresh the film cache
- * Loads ALL films from DB once per pipeline run for O(1) lookups
+ * Initialize film cache for O(1) lookups during pipeline run
+ * Loads all films once - with ~750 films this is fast and simple
  */
 async function initFilmCache(): Promise<Map<string, FilmRecord>> {
-  const allFilms = await db.select().from(films);
   const cache = new Map<string, FilmRecord>();
+  cacheStats = { hits: 0, misses: 0, dbQueries: 0 };
+
+  cacheStats.dbQueries++;
+  const allFilms = await db.select().from(films);
 
   for (const film of allFilms) {
     const normalized = normalizeTitle(film.title);
@@ -60,6 +66,29 @@ async function initFilmCache(): Promise<Map<string, FilmRecord>> {
 
   console.log(`[Pipeline] Film cache initialized with ${cache.size} unique films (${allFilms.length} total)`);
   return cache;
+}
+
+/**
+ * Lookup a film in cache (O(1) access)
+ * Returns null on cache miss - the film is likely new and will be created
+ */
+function lookupFilmInCache(normalizedTitle: string): FilmRecord | null {
+  const cached = filmCache?.get(normalizedTitle);
+  if (cached) {
+    cacheStats.hits++;
+    return cached;
+  }
+  cacheStats.misses++;
+  return null;
+}
+
+/**
+ * Log cache performance stats
+ */
+function logCacheStats(): void {
+  const total = cacheStats.hits + cacheStats.misses;
+  const hitRate = total > 0 ? ((cacheStats.hits / total) * 100).toFixed(1) : "0";
+  console.log(`[Pipeline] Cache stats: ${cacheStats.hits} hits, ${cacheStats.misses} misses (${hitRate}% hit rate), ${cacheStats.dbQueries} DB queries`);
 }
 
 /**
@@ -112,7 +141,7 @@ export async function processScreenings(
     }
   }
 
-  // Initialize film cache for this pipeline run (loads ALL films once)
+  // Initialize film cache for O(1) lookups
   filmCache = await initFilmCache();
 
   const result: PipelineResult = {
@@ -193,6 +222,9 @@ export async function processScreenings(
   console.log(
     `[Pipeline] Complete: ${result.added} added, ${result.updated} updated, ${result.failed} failed`
   );
+
+  // Log cache performance stats
+  logCacheStats();
 
   // Run agent-based analysis if enabled
   if (AGENTS_ENABLED && result.added > 0) {
@@ -299,7 +331,7 @@ async function getOrCreateFilm(
 
   // Try to find existing film using the pre-loaded cache (O(1) lookup)
   // This fixes the previous bug where .limit(100) missed most films
-  const existing = filmCache?.get(normalized);
+  const existing = lookupFilmInCache(normalized);
 
   if (existing) {
     // If existing film lacks a poster, try to find one
@@ -432,6 +464,9 @@ async function getOrCreateFilm(
         decade: match.year ? getDecade(match.year) : null,
         tmdbRating: details.details.vote_average,
         letterboxdUrl: null,
+        matchConfidence: match.confidence ?? null,
+        matchStrategy: "auto-with-year",
+        matchedAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -509,6 +544,9 @@ async function getOrCreateFilm(
     imdbId: null,
     tmdbRating: null,
     letterboxdUrl: null,
+    matchConfidence: null,
+    matchStrategy: null,
+    matchedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   });

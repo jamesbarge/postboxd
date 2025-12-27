@@ -30,10 +30,12 @@ import {
   SignedOut,
   UserButton,
 } from "@clerk/nextjs";
-import { format, addDays, startOfToday, isSameDay } from "date-fns";
+import { format, addDays, startOfToday, isSameDay, isSaturday, isSunday, differenceInDays } from "date-fns";
+import { MobileDatePickerModal } from "@/components/filters/mobile-date-picker-modal";
 import { DayPicker } from "react-day-picker";
 import { cn } from "@/lib/cn";
 import { useFilters, TIME_PRESETS, formatTimeRange, formatHour } from "@/stores/filters";
+import { usePreferences } from "@/stores/preferences";
 import { Button, IconButton } from "@/components/ui";
 import { Clock } from "lucide-react";
 
@@ -73,6 +75,7 @@ export function Header({ cinemas }: HeaderProps) {
                 label="Watchlist"
               />
             </Link>
+            <MapFilterButton mounted={mounted} />
             <Link href="/settings">
               <IconButton
                 variant="ghost"
@@ -349,8 +352,22 @@ function FilmTypeFilter({ mounted, fullWidth }: { mounted: boolean; fullWidth?: 
 function DateFilter({ mounted }: { mounted: boolean; fullWidth?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showTimeCustom, setShowTimeCustom] = useState(false);
+  const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { dateFrom, dateTo, setDateRange, timeFrom, timeTo, setTimeRange } = useFilters();
+
+  // Check if Weekend preset is active
+  const isWeekendActive = () => {
+    if (!dateFrom || !dateTo) return false;
+    return isSaturday(dateFrom) && isSunday(dateTo) && differenceInDays(dateTo, dateFrom) === 1;
+  };
+
+  // Check if 7 Days preset is active
+  const is7DaysActive = () => {
+    const today = startOfToday();
+    if (!dateFrom || !dateTo) return false;
+    return isSameDay(dateFrom, today) && differenceInDays(dateTo, dateFrom) === 6;
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -408,10 +425,19 @@ function DateFilter({ mounted }: { mounted: boolean; fullWidth?: boolean }) {
     return timeFrom === preset.from && timeTo === preset.to;
   };
 
+  const handleButtonClick = () => {
+    // On mobile (< 640px), open full-screen modal instead of dropdown
+    if (typeof window !== "undefined" && window.innerWidth < 640) {
+      setIsMobileModalOpen(true);
+    } else {
+      setIsOpen(!isOpen);
+    }
+  };
+
   return (
     <div ref={containerRef} className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleButtonClick}
         className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all min-w-[140px]",
           hasFilter
@@ -464,7 +490,9 @@ function DateFilter({ mounted }: { mounted: boolean; fullWidth?: boolean }) {
                 }}
                 className={cn(
                   "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
-                  "bg-background-tertiary text-text-secondary hover:bg-background-active hover:text-text-primary"
+                  isWeekendActive()
+                    ? "bg-accent-primary text-text-inverse"
+                    : "bg-background-tertiary text-text-secondary hover:bg-background-active hover:text-text-primary"
                 )}
               >
                 Weekend
@@ -473,7 +501,9 @@ function DateFilter({ mounted }: { mounted: boolean; fullWidth?: boolean }) {
                 onClick={() => setDateRange(today, addDays(today, 6))}
                 className={cn(
                   "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
-                  "bg-background-tertiary text-text-secondary hover:bg-background-active hover:text-text-primary"
+                  is7DaysActive()
+                    ? "bg-accent-primary text-text-inverse"
+                    : "bg-background-tertiary text-text-secondary hover:bg-background-active hover:text-text-primary"
                 )}
               >
                 7 Days
@@ -609,6 +639,12 @@ function DateFilter({ mounted }: { mounted: boolean; fullWidth?: boolean }) {
           )}
         </div>
       )}
+
+      {/* Mobile Full-Screen Modal */}
+      <MobileDatePickerModal
+        isOpen={isMobileModalOpen}
+        onClose={() => setIsMobileModalOpen(false)}
+      />
     </div>
   );
 }
@@ -1011,6 +1047,29 @@ function CinemaFilter({ cinemas, mounted }: { cinemas: Cinema[]; mounted: boolea
         </div>
       )}
     </div>
+  );
+}
+
+// Map Filter Button - shows active state when map area is set
+function MapFilterButton({ mounted }: { mounted: boolean }) {
+  const { mapArea, useMapFiltering } = usePreferences();
+  const isActive = mounted && useMapFiltering && mapArea !== null;
+
+  return (
+    <Link href="/map" className="relative">
+      <IconButton
+        variant="ghost"
+        size="sm"
+        icon={<MapPin className="w-5 h-5" />}
+        label="Cinema Map"
+        className={cn(
+          isActive && "text-accent-primary"
+        )}
+      />
+      {isActive && (
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-accent-primary rounded-full" />
+      )}
+    </Link>
   );
 }
 
