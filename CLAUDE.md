@@ -49,22 +49,120 @@ London cinema calendar app that scrapes screening data from independent cinemas 
 
 ## Tech Stack
 - Next.js 16 with App Router
-- Drizzle ORM with PostgreSQL (Neon)
+- **Drizzle ORM with PostgreSQL (Supabase)** - NOT Neon, we use Supabase for database hosting
 - Playwright for JS-heavy sites (Curzon, BFI, Everyman)
 - Cheerio for static HTML parsing
 - date-fns for date manipulation
 
+## Database Provider - IMPORTANT
+**We use Supabase, NOT Neon.** The database is hosted on Supabase with a PostgreSQL connection string. All database operations go through Drizzle ORM connecting to Supabase.
+
+## Authentication
+- **Clerk** for user authentication (`@clerk/nextjs`)
+- Use `getCurrentUserId()` from `src/lib/auth.ts` for optional auth (returns null if not signed in)
+- Use `requireAuth()` for protected routes (throws if not signed in)
+- User data syncs to cloud when signed in, localStorage-only when anonymous
+
+## State Management
+- **Zustand** for client-side state with `persist` middleware for localStorage
+- Key stores in `src/stores/`:
+  - `film-status.ts` - Watchlist, seen, not interested status per film
+  - `preferences.ts` - User preferences (selected cinemas, etc.)
+  - `filters.ts` - Current filter state for calendar view
+- All stores integrate with PostHog analytics for tracking
+
+## Scraper Architecture
+- All scrapers extend `BaseScraper` from `src/scrapers/base.ts`
+- Two categories:
+  - **Chains** (`src/scrapers/chains/`): Curzon, Picturehouse, Everyman - multi-venue
+  - **Independents** (`src/scrapers/cinemas/`): BFI, PCC, ICA, Barbican, Rio, etc.
+- Scraper types:
+  - **Playwright**: For JS-heavy sites (Curzon, BFI, Everyman) - slower but handles dynamic content
+  - **Cheerio**: For static HTML (most independents) - faster
+  - **API-based**: Picturehouse uses internal API - fastest and most reliable
+- Each scraper has a `run-*.ts` file that executes the scraper and saves to DB
+
+## Data Quality Agents
+- Located in `src/agents/` - powered by Claude Agent SDK
+- Run with `npm run agents` or individual: `npm run agents:links`, `agents:health`, `agents:enrich`
+- Agents:
+  - **Link Validator**: Checks booking URLs still work
+  - **Scraper Health**: Detects anomalies in scraper output
+  - **Enrichment**: Matches films to TMDB, extracts clean titles
+
+## Environment Variables
+Required in `.env.local` (see `.env.local.example`):
+- `DATABASE_URL` - Supabase PostgreSQL connection string (use transaction pooler)
+- `TMDB_API_KEY` / `TMDB_READ_ACCESS_TOKEN` - For film metadata enrichment
+- `NEXT_PUBLIC_CLERK_*` - Clerk auth keys
+- `NEXT_PUBLIC_POSTHOG_*` - Analytics
+- `CRON_SECRET` - Secures cron endpoints
+- `ANTHROPIC_API_KEY` - For Claude agents
+
+## API Routes
+- All in `src/app/api/`
+- Screenings API: `/api/screenings` - main data endpoint with cinema/date filtering
+- User APIs: `/api/user/*` - film statuses, preferences, sync
+- Use Response.json() pattern, not NextResponse
+
 ## Key Files
 - `src/scrapers/` - All cinema scrapers
+- `src/scrapers/base.ts` - Abstract base class for scrapers
 - `src/scrapers/utils/date-parser.ts` - Shared date/time parsing utilities
+- `src/scrapers/pipeline.ts` - Orchestrates scrape → save → enrich flow
 - `docs/scraping-playbook.md` - Documentation for each scraper
 - `src/app/page.tsx` - Main calendar view
-- `src/db/schema.ts` - Database schema
+- `src/db/schema/` - Database schema (split by entity)
+- `src/lib/auth.ts` - Auth helpers
+- `src/stores/` - Zustand state stores
 
 ## Common Commands
 ```bash
+# Development
 npm run dev              # Start dev server
-npm run scrape:curzon    # Run Curzon scraper
-npm run scrape:bfi       # Run BFI scraper
-npm run scrape:picturehouse  # Run Picturehouse scraper (fastest - uses API)
+npm run build            # Production build
+
+# Scrapers - Chains
+npm run scrape:curzon       # Curzon (Playwright)
+npm run scrape:picturehouse # Picturehouse (API - fastest)
+npm run scrape:everyman     # Everyman (Playwright)
+
+# Scrapers - Independents
+npm run scrape:bfi          # BFI Southbank (Playwright)
+npm run scrape:pcc          # Prince Charles Cinema
+npm run scrape:ica          # ICA
+npm run scrape:barbican     # Barbican
+npm run scrape:rio          # Rio Cinema
+npm run scrape:genesis      # Genesis
+npm run scrape:peckhamplex  # Peckham Plex
+npm run scrape:nickel       # The Nickel
+npm run scrape:electric     # Electric Cinema
+npm run scrape:lexi         # Lexi Cinema
+npm run scrape:garden       # Garden Cinema
+
+# Batch scrapers
+npm run scrape:chains       # All chain cinemas
+npm run scrape:independents # All independent cinemas
+npm run scrape:all          # Everything
+
+# Database
+npm run db:push          # Push schema changes to Supabase
+npm run db:seed          # Seed initial data
+npm run db:cleanup-screenings  # Remove past screenings
+npm run db:cleanup-films       # Remove orphaned films
+npm run db:enrich        # Enrich films with TMDB data
+npm run db:classify-events     # Classify events vs films
+
+# Agents
+npm run agents           # Run all data quality agents
+npm run agents:links     # Verify booking links
+npm run agents:health    # Check scraper health
+npm run agents:enrich    # Enrich film metadata
 ```
+
+## Code Conventions
+- Use `date-fns` for all date manipulation, never native Date methods for formatting
+- Film IDs are UUIDs, screening IDs are UUIDs
+- Cinema IDs are slugs (e.g., "bfi-southbank", "curzon-soho")
+- All times stored in UTC in database, displayed in UK timezone
+- PostHog analytics: track meaningful user actions, not every click
