@@ -6,7 +6,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-interface PreferencesState {
+export interface PreferencesState {
   // Selected cinemas (IDs of cinemas the user wants to see)
   selectedCinemas: string[];
 
@@ -19,6 +19,9 @@ interface PreferencesState {
   defaultDateRange: "today" | "tomorrow" | "week" | "weekend" | "all";
   preferredFormats: string[];
 
+  // Sync tracking
+  updatedAt: string; // ISO timestamp for conflict resolution
+
   // Actions
   toggleCinema: (cinemaId: string) => void;
   setCinemas: (cinemaIds: string[]) => void;
@@ -30,6 +33,10 @@ interface PreferencesState {
   setDefaultDateRange: (range: PreferencesState["defaultDateRange"]) => void;
   togglePreferredFormat: (format: string) => void;
   reset: () => void;
+
+  // Sync actions
+  bulkSet: (prefs: Partial<PreferencesState>) => void;
+  getAll: () => Omit<PreferencesState, "toggleCinema" | "setCinemas" | "selectAllCinemas" | "clearCinemas" | "setDefaultView" | "setShowRepertoryOnly" | "setHidePastScreenings" | "setDefaultDateRange" | "togglePreferredFormat" | "reset" | "bulkSet" | "getAll">;
 }
 
 const DEFAULT_STATE = {
@@ -39,11 +46,12 @@ const DEFAULT_STATE = {
   hidePastScreenings: true,
   defaultDateRange: "all" as const,
   preferredFormats: [] as string[],
+  updatedAt: new Date().toISOString(),
 };
 
 export const usePreferences = create<PreferencesState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...DEFAULT_STATE,
 
       toggleCinema: (cinemaId) =>
@@ -51,37 +59,55 @@ export const usePreferences = create<PreferencesState>()(
           selectedCinemas: state.selectedCinemas.includes(cinemaId)
             ? state.selectedCinemas.filter((id) => id !== cinemaId)
             : [...state.selectedCinemas, cinemaId],
+          updatedAt: new Date().toISOString(),
         })),
 
       setCinemas: (cinemaIds) =>
-        set({ selectedCinemas: cinemaIds }),
+        set({ selectedCinemas: cinemaIds, updatedAt: new Date().toISOString() }),
 
       selectAllCinemas: (cinemaIds) =>
-        set({ selectedCinemas: cinemaIds }),
+        set({ selectedCinemas: cinemaIds, updatedAt: new Date().toISOString() }),
 
       clearCinemas: () =>
-        set({ selectedCinemas: [] }),
+        set({ selectedCinemas: [], updatedAt: new Date().toISOString() }),
 
       setDefaultView: (view) =>
-        set({ defaultView: view }),
+        set({ defaultView: view, updatedAt: new Date().toISOString() }),
 
       setShowRepertoryOnly: (show) =>
-        set({ showRepertoryOnly: show }),
+        set({ showRepertoryOnly: show, updatedAt: new Date().toISOString() }),
 
       setHidePastScreenings: (hide) =>
-        set({ hidePastScreenings: hide }),
+        set({ hidePastScreenings: hide, updatedAt: new Date().toISOString() }),
 
       setDefaultDateRange: (range) =>
-        set({ defaultDateRange: range }),
+        set({ defaultDateRange: range, updatedAt: new Date().toISOString() }),
 
       togglePreferredFormat: (format) =>
         set((state) => ({
           preferredFormats: state.preferredFormats.includes(format)
             ? state.preferredFormats.filter((f) => f !== format)
             : [...state.preferredFormats, format],
+          updatedAt: new Date().toISOString(),
         })),
 
-      reset: () => set(DEFAULT_STATE),
+      reset: () => set({ ...DEFAULT_STATE, updatedAt: new Date().toISOString() }),
+
+      // Sync actions
+      bulkSet: (prefs) => set({ ...prefs, updatedAt: prefs.updatedAt || new Date().toISOString() }),
+
+      getAll: () => {
+        const state = get();
+        return {
+          selectedCinemas: state.selectedCinemas,
+          defaultView: state.defaultView,
+          showRepertoryOnly: state.showRepertoryOnly,
+          hidePastScreenings: state.hidePastScreenings,
+          defaultDateRange: state.defaultDateRange,
+          preferredFormats: state.preferredFormats,
+          updatedAt: state.updatedAt,
+        };
+      },
     }),
     {
       name: "postboxd-preferences",

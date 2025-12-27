@@ -50,6 +50,22 @@ export interface FilterState {
   // Personal
   hideSeen: boolean;
   hideNotInterested: boolean;
+
+  // Sync tracking (for persisted fields only)
+  updatedAt: string; // ISO timestamp for conflict resolution
+}
+
+// Type for persisted filter fields (synced to server)
+export interface PersistedFilters {
+  cinemaIds: string[];
+  formats: string[];
+  programmingTypes: ProgrammingType[];
+  decades: string[];
+  genres: string[];
+  timesOfDay: TimeOfDay[];
+  hideSeen: boolean;
+  hideNotInterested: boolean;
+  updatedAt: string;
 }
 
 interface FilterActions {
@@ -70,6 +86,10 @@ interface FilterActions {
   setHideNotInterested: (hide: boolean) => void;
   clearAllFilters: () => void;
   getActiveFilterCount: () => number;
+
+  // Sync actions
+  bulkSetPersisted: (filters: Partial<PersistedFilters>) => void;
+  getPersistedFilters: () => PersistedFilters;
 }
 
 const initialState: FilterState = {
@@ -86,6 +106,7 @@ const initialState: FilterState = {
   timesOfDay: [],
   hideSeen: false,
   hideNotInterested: true, // Films marked "not interested" are hidden by default
+  updatedAt: new Date().toISOString(),
 };
 
 export const useFilters = create<FilterState & FilterActions>()(
@@ -107,12 +128,13 @@ export const useFilters = create<FilterState & FilterActions>()(
           cinemaIds: isRemoving
             ? state.cinemaIds.filter((id) => id !== cinemaId)
             : [...state.cinemaIds, cinemaId],
+          updatedAt: new Date().toISOString(),
         };
       }),
 
       setCinemas: (cinemaIds) => {
         trackFilterChange("cinemas", cinemaIds, "set");
-        set({ cinemaIds });
+        set({ cinemaIds, updatedAt: new Date().toISOString() });
       },
 
       setDateRange: (from, to) => {
@@ -132,6 +154,7 @@ export const useFilters = create<FilterState & FilterActions>()(
           formats: isRemoving
             ? state.formats.filter((f) => f !== format)
             : [...state.formats, format],
+          updatedAt: new Date().toISOString(),
         };
       }),
 
@@ -142,12 +165,13 @@ export const useFilters = create<FilterState & FilterActions>()(
           programmingTypes: isRemoving
             ? state.programmingTypes.filter((t) => t !== type)
             : [...state.programmingTypes, type],
+          updatedAt: new Date().toISOString(),
         };
       }),
 
       setProgrammingTypes: (types) => {
         trackFilterChange("programming_types", types, "set");
-        set({ programmingTypes: types });
+        set({ programmingTypes: types, updatedAt: new Date().toISOString() });
       },
 
       toggleDecade: (decade) => set((state) => {
@@ -157,12 +181,13 @@ export const useFilters = create<FilterState & FilterActions>()(
           decades: isRemoving
             ? state.decades.filter((d) => d !== decade)
             : [...state.decades, decade],
+          updatedAt: new Date().toISOString(),
         };
       }),
 
       setDecades: (decades) => {
         trackFilterChange("decades", decades, "set");
-        set({ decades });
+        set({ decades, updatedAt: new Date().toISOString() });
       },
 
       toggleGenre: (genre) => set((state) => {
@@ -172,12 +197,13 @@ export const useFilters = create<FilterState & FilterActions>()(
           genres: isRemoving
             ? state.genres.filter((g) => g !== genre)
             : [...state.genres, genre],
+          updatedAt: new Date().toISOString(),
         };
       }),
 
       setGenres: (genres) => {
         trackFilterChange("genres", genres, "set");
-        set({ genres });
+        set({ genres, updatedAt: new Date().toISOString() });
       },
 
       toggleTimeOfDay: (time) => set((state) => {
@@ -187,22 +213,23 @@ export const useFilters = create<FilterState & FilterActions>()(
           timesOfDay: isRemoving
             ? state.timesOfDay.filter((t) => t !== time)
             : [...state.timesOfDay, time],
+          updatedAt: new Date().toISOString(),
         };
       }),
 
       setHideSeen: (hide) => {
         trackFilterChange("hide_seen", hide, "set");
-        set({ hideSeen: hide });
+        set({ hideSeen: hide, updatedAt: new Date().toISOString() });
       },
 
       setHideNotInterested: (hide) => {
         trackFilterChange("hide_not_interested", hide, "set");
-        set({ hideNotInterested: hide });
+        set({ hideNotInterested: hide, updatedAt: new Date().toISOString() });
       },
 
       clearAllFilters: () => {
         trackFilterChange("all", null, "cleared");
-        set(initialState);
+        set({ ...initialState, updatedAt: new Date().toISOString() });
       },
 
       getActiveFilterCount: () => {
@@ -222,6 +249,27 @@ export const useFilters = create<FilterState & FilterActions>()(
         // Users expect "not interested" films to be hidden automatically
         return count;
       },
+
+      // Sync actions - update persisted fields from server merge
+      bulkSetPersisted: (filters) => set({
+        ...filters,
+        updatedAt: filters.updatedAt || new Date().toISOString(),
+      }),
+
+      getPersistedFilters: () => {
+        const state = get();
+        return {
+          cinemaIds: state.cinemaIds,
+          formats: state.formats,
+          programmingTypes: state.programmingTypes,
+          decades: state.decades,
+          genres: state.genres,
+          timesOfDay: state.timesOfDay,
+          hideSeen: state.hideSeen,
+          hideNotInterested: state.hideNotInterested,
+          updatedAt: state.updatedAt,
+        };
+      },
     }),
     {
       name: "postboxd-filters",
@@ -235,6 +283,7 @@ export const useFilters = create<FilterState & FilterActions>()(
         timesOfDay: state.timesOfDay,
         hideSeen: state.hideSeen,
         hideNotInterested: state.hideNotInterested,
+        updatedAt: state.updatedAt,
       }),
     }
   )
