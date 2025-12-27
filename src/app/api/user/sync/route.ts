@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, userFilmStatuses, userPreferences } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireAuth, unauthorizedResponse } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth";
 import { checkRateLimit, getClientIP, RATE_LIMITS } from "@/lib/rate-limit";
 import { currentUser } from "@clerk/nextjs/server";
 import type { StoredPreferences, StoredFilters } from "@/db/schema/user-preferences";
+import { RateLimitError, handleApiError } from "@/lib/api-errors";
 
 interface FilmStatusPayload {
   filmId: string;
@@ -38,23 +39,17 @@ interface SyncRequest {
  * 4. Returns the merged data for client to apply
  */
 export async function POST(request: NextRequest) {
-  // Rate limit check
-  const ip = getClientIP(request);
-  const rateLimitResult = checkRateLimit(ip, { ...RATE_LIMITS.sync, prefix: "sync" });
-  if (!rateLimitResult.success) {
-    return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": String(rateLimitResult.resetIn),
-          "X-RateLimit-Remaining": "0",
-        },
-      }
-    );
-  }
-
   try {
+    // Rate limit check
+    const ip = getClientIP(request);
+    const rateLimitResult = checkRateLimit(ip, { ...RATE_LIMITS.sync, prefix: "sync" });
+    if (!rateLimitResult.success) {
+      throw new RateLimitError(
+        "Too many requests. Please try again later.",
+        rateLimitResult.resetIn
+      );
+    }
+
     const userId = await requireAuth();
     const clerkUser = await currentUser();
     const body = (await request.json()) as SyncRequest;
@@ -230,10 +225,6 @@ export async function POST(request: NextRequest) {
       preferencesUpdatedAt,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return unauthorizedResponse();
-    }
-    console.error("Sync error:", error);
-    return NextResponse.json({ error: "Failed to sync" }, { status: 500 });
+    return handleApiError(error, "POST /api/user/sync");
   }
 }

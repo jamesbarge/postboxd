@@ -10,6 +10,7 @@ import { eq, gte, lte, and, inArray } from "drizzle-orm";
 import { startOfDay, endOfDay, addDays } from "date-fns";
 import { z } from "zod";
 import type { ScreeningFormat } from "@/types/screening";
+import { BadRequestError, handleApiError } from "@/lib/api-errors";
 
 // Input validation schema
 const querySchema = z.object({
@@ -34,9 +35,9 @@ export async function GET(request: NextRequest) {
     });
 
     if (!parseResult.success) {
-      return NextResponse.json(
-        { error: "Invalid query parameters", details: parseResult.error.flatten() },
-        { status: 400 }
+      throw new BadRequestError(
+        "Invalid query parameters",
+        parseResult.error.flatten()
       );
     }
 
@@ -124,10 +125,6 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error("Error fetching screenings:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch screenings" },
-      { status: 500 }
-    );
+    return handleApiError(error, "GET /api/screenings");
   }
 }
