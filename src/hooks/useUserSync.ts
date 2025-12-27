@@ -22,14 +22,13 @@ import {
 // Debounce delay for sync (500ms)
 const SYNC_DEBOUNCE_MS = 500;
 
-// Track if initial sync has been performed this session
-let initialSyncPerformed = false;
-
 export function useUserSync() {
   const { isSignedIn, isLoaded } = useUser();
   const filmStatusDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const preferencesDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const isSyncingRef = useRef(false);
+  // Track if initial sync has been performed (using ref instead of global variable for SSR safety)
+  const initialSyncPerformedRef = useRef(false);
 
   // Debounced film status push
   const debouncedPushFilmStatuses = useCallback(() => {
@@ -59,10 +58,10 @@ export function useUserSync() {
   useEffect(() => {
     if (!isLoaded) return;
 
-    if (isSignedIn && !initialSyncPerformed) {
+    if (isSignedIn && !initialSyncPerformedRef.current) {
       console.log("[Sync] User signed in, performing initial sync...");
       isSyncingRef.current = true;
-      initialSyncPerformed = true;
+      initialSyncPerformedRef.current = true;
 
       performFullSync().finally(() => {
         isSyncingRef.current = false;
@@ -71,7 +70,7 @@ export function useUserSync() {
 
     // Reset flag on sign-out so next sign-in triggers sync
     if (!isSignedIn) {
-      initialSyncPerformed = false;
+      initialSyncPerformedRef.current = false;
     }
   }, [isSignedIn, isLoaded]);
 

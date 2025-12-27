@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { addDays, format } from "date-fns";
 import { CalendarView } from "./calendar-view";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { Loader2, ChevronDown } from "lucide-react";
 
 interface Screening {
@@ -127,7 +128,9 @@ export function CalendarViewWithLoader({ initialScreenings }: CalendarViewWithLo
 
   return (
     <div>
-      <CalendarView screenings={allScreenings} />
+      <ErrorBoundary>
+        <CalendarView screenings={allScreenings} />
+      </ErrorBoundary>
 
       {/* Load More Button */}
       {canLoadMore && (

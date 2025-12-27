@@ -3,11 +3,46 @@ import { db } from "@/db";
 import { films, screenings } from "@/db/schema";
 import { ilike, or, sql, asc, gte, lte, eq, and } from "drizzle-orm";
 import { startOfDay, addDays } from "date-fns";
+import { z } from "zod";
+import { checkRateLimit, getClientIP, RATE_LIMITS } from "@/lib/rate-limit";
+
+// Input validation schema
+const querySchema = z.object({
+  q: z.string().max(100).optional(),
+  browse: z.enum(["true", "false"]).optional(),
+});
 
 export async function GET(request: NextRequest) {
+  // Rate limit check
+  const ip = getClientIP(request);
+  const rateLimitResult = checkRateLimit(ip, { ...RATE_LIMITS.search, prefix: "search" });
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: "Too many requests", results: [] },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateLimitResult.resetIn) },
+      }
+    );
+  }
+
   const searchParams = request.nextUrl.searchParams;
-  const query = searchParams.get("q")?.trim();
-  const browse = searchParams.get("browse") === "true";
+
+  // Validate query parameters
+  const parseResult = querySchema.safeParse({
+    q: searchParams.get("q") || undefined,
+    browse: searchParams.get("browse") || undefined,
+  });
+
+  if (!parseResult.success) {
+    return NextResponse.json(
+      { error: "Invalid query parameters", results: [] },
+      { status: 400 }
+    );
+  }
+
+  const query = parseResult.data.q?.trim();
+  const browse = parseResult.data.browse === "true";
 
   // Only show films with screenings in the next 30 days
   const startDate = startOfDay(new Date());

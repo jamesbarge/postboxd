@@ -3,6 +3,27 @@ import { db } from "@/db";
 import { userFilmStatuses } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth";
+import { z } from "zod";
+
+// Validation schema for film status
+const filmStatusSchema = z.object({
+  filmId: z.string().uuid(),
+  status: z.enum(["want_to_see", "seen", "not_interested"]),
+  addedAt: z.string().datetime(),
+  seenAt: z.string().datetime().nullable().optional(),
+  rating: z.number().int().min(1).max(5).nullable().optional(),
+  notes: z.string().max(1000).nullable().optional(),
+  filmTitle: z.string().max(500).nullable().optional(),
+  filmYear: z.number().int().min(1800).max(2100).nullable().optional(),
+  filmDirectors: z.array(z.string().max(200)).nullable().optional(),
+  filmPosterUrl: z.string().url().max(500).nullable().optional(),
+  updatedAt: z.string().datetime(),
+});
+
+// Validation for POST body
+const postBodySchema = z.object({
+  statuses: z.array(filmStatusSchema).max(500), // Limit batch size
+});
 
 /**
  * GET /api/user/film-statuses - Fetch all film statuses for the current user
@@ -31,19 +52,8 @@ export async function GET() {
   }
 }
 
-interface FilmStatusPayload {
-  filmId: string;
-  status: "want_to_see" | "seen" | "not_interested";
-  addedAt: string;
-  seenAt?: string | null;
-  rating?: number | null;
-  notes?: string | null;
-  filmTitle?: string | null;
-  filmYear?: number | null;
-  filmDirectors?: string[] | null;
-  filmPosterUrl?: string | null;
-  updatedAt: string;
-}
+// Infer type from schema
+type FilmStatusPayload = z.infer<typeof filmStatusSchema>;
 
 /**
  * POST /api/user/film-statuses - Bulk upsert film statuses
@@ -57,10 +67,20 @@ export async function POST(request: NextRequest) {
   try {
     const userId = await requireAuth();
     const body = await request.json();
-    const { statuses } = body as { statuses: FilmStatusPayload[] };
 
-    if (!Array.isArray(statuses) || statuses.length === 0) {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    // Validate request body
+    const parseResult = postBodySchema.safeParse(body);
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: "Invalid request body", details: parseResult.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const { statuses } = parseResult.data;
+
+    if (statuses.length === 0) {
+      return NextResponse.json({ success: true, results: { processed: 0, skipped: 0 } });
     }
 
     // 1. Fetch all existing statuses for this user in ONE query
