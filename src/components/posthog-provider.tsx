@@ -9,7 +9,10 @@ import { useUser } from "@clerk/nextjs";
 // Initialize PostHog only on the client side
 if (typeof window !== "undefined") {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
-    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://eu.i.posthog.com",
+    // Use reverse proxy to avoid ad blockers
+    api_host: "/ingest",
+    // UI host for PostHog toolbar and feature flags UI
+    ui_host: "https://eu.posthog.com",
     // Capture pageviews manually for App Router compatibility
     capture_pageview: false,
     // Capture pageleaves for session replay accuracy
