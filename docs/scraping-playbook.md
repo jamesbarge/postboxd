@@ -20,6 +20,7 @@ This document describes how each cinema website is scraped, including the approa
 | **Everyman** | Date tabs | Playwright | `/venues-list/{code}-everyman-{slug}/` | Working |
 | **Lexi** | Single page | Playwright | `/TheLexiCinema.dll/Home` | Broken |
 | **Garden Cinema** | Single page | No | `thegardencinema.co.uk` homepage | Working |
+| **Close-Up Cinema** | Embedded JSON | No | `closeupfilmcentre.com` homepage | Working |
 
 ---
 
@@ -255,6 +256,51 @@ west_norwood: 10099, ealing: 10107
 - Very clean data structure with well-labeled CSS classes
 - Rating appears inside the title link and needs to be stripped
 - All times are in 24-hour format, no AM/PM parsing needed
+
+---
+
+### 14. Close-Up Cinema
+
+**File:** `src/scrapers/cinemas/close-up.ts`
+
+**Approach:**
+- Single page fetch from homepage
+- No browser needed - data is embedded as JSON string
+- All screening data stored in a JavaScript variable as a quoted JSON string
+- Uses TicketSource for booking
+
+**Data Format:**
+- Variable: `var shows ='[{...}]';` (JSON wrapped in single quotes as a string)
+- NOT a direct JSON array like Rio Cinema
+
+**JSON Structure:**
+```javascript
+{
+  id: "56611",           // Screening ID
+  fp_id: "4184",         // Film programme ID
+  title: "Lolita",       // Film title
+  blink: "https://www.ticketsource.co.uk/close-up-cinema/e-agrkqb",  // Booking URL
+  show_time: "2025-12-28 14:00:00",  // Format: YYYY-MM-DD HH:MM:SS (24-hour)
+  status: "1",           // 1 = active
+  booking_availability: "book",
+  film_url: "/film_programmes/2025/close-up-on-stanley-kubrick/lolita"
+}
+```
+
+**Date/Time Format:** `"YYYY-MM-DD HH:MM:SS"` - already in 24-hour format, no AM/PM parsing needed
+
+**Key Patterns:**
+- Extract JSON string: `var\s+shows\s*=\s*'(\[[\s\S]*?\])'\s*;`
+- The JSON has escaped forward slashes (`\/`) which is valid JSON
+
+**URL Pattern:** Homepage only - `https://www.closeupfilmcentre.com`
+
+**Notes:**
+- Small intimate cinema in Shoreditch, East London
+- Known for Stanley Kubrick retrospectives and curated seasons
+- Simple data structure - single-screen venue
+- All times in 24-hour format
+- Booking handled via TicketSource
 
 ---
 

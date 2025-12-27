@@ -70,14 +70,12 @@ export const screenings = pgTable(
     // linkLastChecked: timestamp("link_last_checked", { withTimezone: true }),
   },
   (table) => [
-    // Indexes for common query patterns
+    // Primary datetime index for range scans (most queries filter by date)
     index("idx_screenings_datetime").on(table.datetime),
-    index("idx_screenings_film").on(table.filmId),
-    index("idx_screenings_cinema").on(table.cinemaId),
-    // Composite index for calendar queries
-    index("idx_screenings_calendar").on(table.datetime, table.cinemaId),
-    // Index for upcoming screenings query
-    index("idx_screenings_upcoming").on(table.datetime, table.filmId),
+    // Compound index for film detail pages: WHERE filmId = ? AND datetime >= ?
+    index("idx_screenings_film_datetime").on(table.filmId, table.datetime),
+    // Compound index for cinema calendar: WHERE cinemaId = ? AND datetime >= ?
+    index("idx_screenings_cinema_datetime").on(table.cinemaId, table.datetime),
     // Unique constraint to prevent duplicate screenings
     uniqueIndex("idx_screenings_unique").on(table.filmId, table.cinemaId, table.datetime),
   ]

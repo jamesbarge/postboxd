@@ -15,6 +15,7 @@
  * - film_url contains the internal film page path
  */
 
+import * as cheerio from "cheerio";
 import { BaseScraper } from "../base";
 import type { RawScreening, ScraperConfig } from "../types";
 
@@ -38,90 +39,181 @@ export class CloseUpCinemaScraper extends BaseScraper {
   };
 
   protected async fetchPages(): Promise<string[]> {
-    // Close Up Cinema has all screening data embedded as JSON on the homepage
-    const url = this.config.baseUrl;
-    console.log(`[${this.config.cinemaId}] Fetching homepage: ${url}`);
+    const pages: string[] = [];
 
-    const html = await this.fetchUrl(url);
-    return [html];
+    // Fetch the homepage first (has JSON data + immediate screenings)
+    const homepageUrl = this.config.baseUrl;
+    console.log(`[${this.config.cinemaId}] Fetching homepage: ${homepageUrl}`);
+    const homepage = await this.fetchUrl(homepageUrl);
+    pages.push(homepage);
+
+    // Fetch future weeks using the date search endpoint
+    // Format: /search_film_programmes/?date=DD-MM-YYYY
+    const today = new Date();
+    const weeksToFetch = 10; // Fetch ~10 weeks ahead
+
+    for (let week = 1; week <= weeksToFetch; week++) {
+      const targetDate = new Date(today);
+      targetDate.setDate(today.getDate() + week * 7);
+
+      const day = targetDate.getDate().toString().padStart(2, "0");
+      const month = (targetDate.getMonth() + 1).toString().padStart(2, "0");
+      const year = targetDate.getFullYear();
+
+      const dateUrl = `${this.config.baseUrl}/search_film_programmes/?date=${day}-${month}-${year}`;
+      console.log(`[${this.config.cinemaId}] Fetching week ${week}: ${dateUrl}`);
+
+      try {
+        const html = await this.fetchUrl(dateUrl);
+        pages.push(html);
+        // Respect rate limiting
+        await this.delay(this.config.delayBetweenRequests);
+      } catch (error) {
+        console.warn(`[${this.config.cinemaId}] Failed to fetch ${dateUrl}:`, error);
+      }
+    }
+
+    return pages;
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   protected async parsePages(htmlPages: string[]): Promise<RawScreening[]> {
     const screenings: RawScreening[] = [];
-    const html = htmlPages[0];
+    const now = new Date();
+    const seenKeys = new Set<string>(); // For deduplication
+    let jsonCount = 0;
+    let htmlCount = 0;
 
-    // Extract the shows JSON from the page
-    // Format: var shows = [{...}, {...}];
-    const showsData = this.extractShowsJson(html);
+    for (let i = 0; i < htmlPages.length; i++) {
+      const html = htmlPages[i];
+      const isHomepage = i === 0;
 
-    if (!showsData || showsData.length === 0) {
-      console.log(`[${this.config.cinemaId}] No shows data found on page`);
-      return [];
+      // 1. Extract from JSON data (only on homepage)
+      if (isHomepage) {
+        const showsData = this.extractShowsJson(html);
+
+        if (showsData && showsData.length > 0) {
+          console.log(`[${this.config.cinemaId}] Found ${showsData.length} shows in JSON`);
+
+          for (const show of showsData) {
+            if (!show.title || !show.show_time) continue;
+            if (show.status !== "1") continue;
+
+            const datetime = this.parseDateTime(show.show_time);
+            if (!datetime || isNaN(datetime.getTime())) continue;
+            if (datetime < now) continue;
+
+            let bookingUrl = show.blink;
+            if (!bookingUrl && show.film_url) {
+              bookingUrl = this.normalizeUrl(show.film_url);
+            }
+            if (!bookingUrl) continue;
+
+            const sourceId = `close-up-${show.id}-${datetime.toISOString()}`;
+            const dedupeKey = `${show.title.trim().toLowerCase()}-${datetime.toISOString()}`;
+
+            if (!seenKeys.has(dedupeKey)) {
+              seenKeys.add(dedupeKey);
+              jsonCount++;
+              screenings.push({
+                filmTitle: show.title.trim(),
+                datetime,
+                bookingUrl,
+                sourceId,
+              });
+            }
+          }
+        }
+      }
+
+      // 2. Extract from HTML listings (all pages)
+      const pageHtmlScreenings = this.extractFromHtml(html, now, seenKeys);
+      htmlCount += pageHtmlScreenings.length;
+      screenings.push(...pageHtmlScreenings);
     }
 
-    console.log(`[${this.config.cinemaId}] Found ${showsData.length} shows in JSON`);
+    console.log(`[${this.config.cinemaId}] Found ${screenings.length} future screenings (JSON: ${jsonCount}, HTML: ${htmlCount})`);
+    return screenings;
+  }
 
-    const now = new Date();
+  /**
+   * Extract screenings from HTML listing blocks
+   * These are in format: "Thu 1 January, 8.15pm: Film Title"
+   */
+  private extractFromHtml(html: string, now: Date, seenKeys: Set<string>): RawScreening[] {
+    const screenings: RawScreening[] = [];
+    const $ = cheerio.load(html);
 
-    for (const show of showsData) {
-      // Skip if no title or showtime
-      if (!show.title || !show.show_time) {
-        continue;
-      }
+    // Find all screening blocks - they have h2 with date/time and title
+    $(".inner_block_3 h2 a").each((_, el) => {
+      const text = $(el).text().trim();
+      const href = $(el).attr("href");
 
-      // Skip if status indicates not active
-      if (show.status !== "1") {
-        continue;
-      }
+      // Parse format: "Thu 1 January, 8.15pm: Ten" or "Sun 4 January, 8pm: Taste of Cherry"
+      const match = text.match(/^(\w+)\s+(\d+)\s+(\w+),?\s+(\d+)(?:[.:](\d+))?(am|pm):\s*(.+)$/i);
+      if (!match) return;
 
-      // Parse the datetime - format is "YYYY-MM-DD HH:MM:SS"
-      const datetime = this.parseDateTime(show.show_time);
+      const [, , day, month, hour, minute = "0", ampm, title] = match;
 
-      if (!datetime || isNaN(datetime.getTime())) {
-        console.warn(
-          `[${this.config.cinemaId}] Invalid datetime: ${show.show_time} for "${show.title}"`
-        );
-        continue;
-      }
+      // Parse the date
+      const datetime = this.parseHtmlDateTime(day, month, hour, minute, ampm);
+      if (!datetime || datetime < now) return;
 
-      // Skip past screenings
-      if (datetime < now) {
-        continue;
-      }
+      // Build booking URL from href
+      const bookingUrl = href ? this.normalizeUrl(href) : null;
+      if (!bookingUrl) return;
 
-      // Validate time - cinema screenings should typically be 10:00-23:59
-      const hours = datetime.getHours();
-      if (hours < 10 && hours !== 0) {
-        console.warn(
-          `[${this.config.cinemaId}] Unusual early time: ${show.show_time} for "${show.title}" - verify this is correct`
-        );
-      }
+      const dedupeKey = `${title.trim().toLowerCase()}-${datetime.toISOString()}`;
+      if (seenKeys.has(dedupeKey)) return;
 
-      // Build booking URL - prefer TicketSource link if available
-      let bookingUrl = show.blink;
-      if (!bookingUrl && show.film_url) {
-        // Fallback to film page if no direct booking link
-        bookingUrl = this.normalizeUrl(show.film_url);
-      }
-
-      if (!bookingUrl) {
-        console.warn(`[${this.config.cinemaId}] No booking URL for "${show.title}"`);
-        continue;
-      }
-
-      // Create sourceId for deduplication
-      const sourceId = `close-up-${show.id}-${datetime.toISOString()}`;
+      seenKeys.add(dedupeKey);
+      const sourceId = `close-up-html-${datetime.toISOString()}-${title.replace(/\s+/g, "-").toLowerCase()}`;
 
       screenings.push({
-        filmTitle: show.title.trim(),
+        filmTitle: title.trim(),
         datetime,
         bookingUrl,
         sourceId,
       });
+    });
+
+    return screenings;
+  }
+
+  /**
+   * Parse datetime from HTML format: "1", "January", "8", "15", "pm"
+   */
+  private parseHtmlDateTime(day: string, month: string, hour: string, minute: string, ampm: string): Date | null {
+    const months: Record<string, number> = {
+      january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+      july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+    };
+
+    const monthNum = months[month.toLowerCase()];
+    if (monthNum === undefined) return null;
+
+    let hourNum = parseInt(hour, 10);
+    const minuteNum = parseInt(minute, 10);
+
+    // Convert to 24-hour
+    if (ampm.toLowerCase() === "pm" && hourNum !== 12) {
+      hourNum += 12;
+    } else if (ampm.toLowerCase() === "am" && hourNum === 12) {
+      hourNum = 0;
     }
 
-    console.log(`[${this.config.cinemaId}] Found ${screenings.length} future screenings`);
-    return screenings;
+    // Determine year - if month is in the past, assume next year
+    const now = new Date();
+    let year = now.getFullYear();
+    const testDate = new Date(year, monthNum, parseInt(day, 10));
+    if (testDate < now) {
+      year++;
+    }
+
+    return new Date(year, monthNum, parseInt(day, 10), hourNum, minuteNum, 0);
   }
 
   /**

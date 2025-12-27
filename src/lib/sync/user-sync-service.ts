@@ -55,19 +55,23 @@ function filtersToServerFormat(): StoredFilters {
  */
 function filmStatusesToApiFormat() {
   const films = useFilmStatus.getState().getAllFilms();
-  return Object.entries(films).map(([filmId, entry]) => ({
-    filmId,
-    status: entry.status!,
-    addedAt: entry.addedAt,
-    seenAt: entry.seenAt || null,
-    rating: entry.rating || null,
-    notes: entry.notes || null,
-    filmTitle: entry.filmTitle || null,
-    filmYear: entry.filmYear || null,
-    filmDirectors: entry.filmDirectors || null,
-    filmPosterUrl: entry.filmPosterUrl || null,
-    updatedAt: entry.updatedAt,
-  }));
+  return Object.entries(films)
+    // Filter out entries with null status (shouldn't happen but be defensive)
+    .filter(([, entry]) => entry.status != null)
+    .map(([filmId, entry]) => ({
+      filmId,
+      status: entry.status!,
+      addedAt: entry.addedAt,
+      seenAt: entry.seenAt || null,
+      rating: entry.rating || null,
+      notes: entry.notes || null,
+      filmTitle: entry.filmTitle || null,
+      filmYear: entry.filmYear || null,
+      filmDirectors: entry.filmDirectors || null,
+      filmPosterUrl: entry.filmPosterUrl || null,
+      // Default to addedAt if updatedAt is missing (legacy data migration)
+      updatedAt: entry.updatedAt || entry.addedAt,
+    }));
 }
 
 /**
