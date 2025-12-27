@@ -5,9 +5,9 @@ import { endOfDay, addDays, startOfDay } from "date-fns";
 import { CalendarViewWithLoader } from "@/components/calendar/calendar-view-loader";
 import { Header } from "@/components/layout/header";
 
-// ISR: Revalidate every 5 minutes for fast cached loads
-// Data only changes when scrapers run (weekly)
-export const revalidate = 300;
+// Dynamic rendering - data changes frequently and depends on current time
+// ISR doesn't work well with time-sensitive filtering (past screenings)
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
   // Fetch only 7 days initially for fast load
