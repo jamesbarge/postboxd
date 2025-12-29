@@ -23,6 +23,7 @@ This document describes how each cinema website is scraped, including the approa
 | **Garden Cinema** | Single page | No | `thegardencinema.co.uk` homepage | Working |
 | **Close-Up Cinema** | Embedded JSON | No | `closeupfilmcentre.com` homepage | Working |
 | **Cine Lumiere** | Single page | No | `cinelumiere.savoysystems.co.uk/CineLumiere.dll/` | Working |
+| **Castle Cinema** | JSON-LD | No | `thecastlecinema.com` homepage | Working |
 
 ---
 
@@ -500,6 +501,53 @@ west_norwood: 10099, ealing: 10107
 - Certificate ratings (15, 12A, etc.) stripped from film titles
 - Some performances show "(Closed for Booking)" status - these are skipped
 - Timezone: Times are in UK local time (GMT/BST). Running scrapers from non-UK timezone machines may cause 1-hour offset; production runs should use UK timezone
+
+---
+
+### 16. Castle Cinema
+
+**File:** `src/scrapers/cinemas/castle.ts`
+
+**Approach:**
+- Single page fetch from homepage
+- No browser needed - data is embedded as JSON-LD
+- Uses Schema.org ScreeningEvent structured data
+- Uses Admit One for booking
+
+**Data Format:**
+- Multiple `<script type="application/ld+json">` blocks in page
+- Filter for blocks where `@type === "ScreeningEvent"`
+- First block is MovieTheater metadata, rest are screenings
+
+**JSON-LD Structure:**
+```javascript
+{
+  "@context": "http://schema.org",
+  "@type": "ScreeningEvent",
+  "@id": "https://thecastlecinema.com/bookings/15454/",
+  "name": "Sentimental Value",
+  "description": "Sentimental Value",
+  "url": "https://thecastlecinema.com/bookings/15454/",
+  "doorTime": "2025-12-29T20:45:00",
+  "startDate": "2025-12-29T20:45:00",
+  "duration": "PT133M",
+  "workPresented": {
+    "@type": "Movie",
+    "name": "Sentimental Value",
+    "url": "https://thecastlecinema.com/programme/105991/..."
+  }
+}
+```
+
+**Date/Time Format:** ISO datetime `"YYYY-MM-DDTHH:MM:SS"` - unambiguous, no parsing needed
+
+**Booking URL Pattern:** `https://thecastlecinema.com/bookings/{id}/`
+
+**Notes:**
+- Community cinema in Hackney (Homerton) with 82-seat + 27-seat screens
+- JSON-LD is the cleanest data source possible - no HTML parsing needed
+- Duration in ISO 8601 format (PT133M = 133 minutes)
+- Also manages Catford Storyteller cinema (may share booking system)
 
 ---
 
