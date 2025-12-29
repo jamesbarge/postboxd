@@ -6,9 +6,16 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { MapPin, Check, Globe, Clapperboard, Search, X, ChevronDown } from "lucide-react";
+import { MapPin, Check, Globe, Clapperboard, Search, X, ChevronDown, Building2, Store } from "lucide-react";
 import { useFilters } from "@/stores/filters";
 import { cn } from "@/lib/cn";
+
+type CinemaTypeFilter = "all" | "independent" | "chain";
+
+/** Check if a cinema is independent (BFI is treated as independent) */
+function isIndependent(chain: string | null): boolean {
+  return chain === null || chain === "BFI";
+}
 
 interface Cinema {
   id: string;
@@ -39,6 +46,7 @@ export function CinemaSelector({ cinemas }: CinemaSelectorProps) {
     return typeof window !== "undefined";
   });
   const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState<CinemaTypeFilter>("all");
   const [groupByArea, setGroupByArea] = useState(true);
   const [collapsedAreas, setCollapsedAreas] = useState<Set<string>>(new Set());
 
@@ -48,18 +56,28 @@ export function CinemaSelector({ cinemas }: CinemaSelectorProps) {
     if (!mounted) setMounted(true);
   }, [mounted]);
 
+  // Filter cinemas by type (independent vs chain)
+  const typeFilteredCinemas = useMemo(() => {
+    if (typeFilter === "all") return cinemas;
+    if (typeFilter === "independent") {
+      return cinemas.filter((c) => isIndependent(c.chain));
+    }
+    // chain filter - exclude independents
+    return cinemas.filter((c) => !isIndependent(c.chain));
+  }, [cinemas, typeFilter]);
+
   // Filter cinemas by search term
   const filteredCinemas = useMemo(() => {
-    if (!searchTerm.trim()) return cinemas;
+    if (!searchTerm.trim()) return typeFilteredCinemas;
     const term = searchTerm.toLowerCase();
-    return cinemas.filter(
+    return typeFilteredCinemas.filter(
       (c) =>
         c.name.toLowerCase().includes(term) ||
         c.shortName?.toLowerCase().includes(term) ||
         c.address?.area?.toLowerCase().includes(term) ||
         c.chain?.toLowerCase().includes(term)
     );
-  }, [cinemas, searchTerm]);
+  }, [typeFilteredCinemas, searchTerm]);
 
   // Group cinemas by area
   const groupedCinemas = useMemo(() => {
@@ -172,6 +190,45 @@ export function CinemaSelector({ cinemas }: CinemaSelectorProps) {
             <X className="w-4 h-4 text-text-tertiary" />
           </button>
         )}
+      </div>
+
+      {/* Type Filter Toggle */}
+      <div className="flex gap-1 p-1 mb-4 bg-background-tertiary rounded-lg w-fit">
+        <button
+          onClick={() => setTypeFilter("all")}
+          className={cn(
+            "px-3 py-1.5 text-sm rounded-md transition-all",
+            typeFilter === "all"
+              ? "bg-background-primary text-text-primary shadow-sm"
+              : "text-text-secondary hover:text-text-primary"
+          )}
+        >
+          All
+        </button>
+        <button
+          onClick={() => setTypeFilter("independent")}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-all",
+            typeFilter === "independent"
+              ? "bg-background-primary text-text-primary shadow-sm"
+              : "text-text-secondary hover:text-text-primary"
+          )}
+        >
+          <Store className="w-3.5 h-3.5" />
+          Independent
+        </button>
+        <button
+          onClick={() => setTypeFilter("chain")}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-all",
+            typeFilter === "chain"
+              ? "bg-background-primary text-text-primary shadow-sm"
+              : "text-text-secondary hover:text-text-primary"
+          )}
+        >
+          <Building2 className="w-3.5 h-3.5" />
+          Chains
+        </button>
       </div>
 
       {/* Quick Actions */}
