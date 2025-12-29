@@ -5,6 +5,7 @@ import { endOfDay, addDays, startOfDay, format } from "date-fns";
 import { unstable_cache } from "next/cache";
 import { CalendarViewWithLoader } from "@/components/calendar/calendar-view-loader";
 import { Header } from "@/components/layout/header";
+import { FeatureDiscoveryBanner } from "@/components/discovery/feature-discovery-banner";
 
 // Dynamic rendering with data-layer caching
 // Force-dynamic prevents build timeout, unstable_cache provides 60s data caching
@@ -89,6 +90,9 @@ export default async function Home() {
     <div className="min-h-screen bg-background-primary">
       {/* Unified Header with Filters */}
       <Header cinemas={allCinemas.map(c => ({ id: c.id, name: c.name, shortName: c.shortName }))} />
+
+      {/* Feature Discovery Banner - dismissible once features are visited */}
+      <FeatureDiscoveryBanner />
 
       {/* Main Content - Full Width */}
       <main className="px-4 sm:px-6 lg:px-8 py-6">

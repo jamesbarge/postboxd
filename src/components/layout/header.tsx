@@ -15,22 +15,13 @@ import {
   MapPin,
   ChevronDown,
   X,
-  Settings,
   Check,
-  Heart,
   Film,
   Sparkles,
   History,
   SlidersHorizontal,
-  User,
-  Navigation,
 } from "lucide-react";
-import {
-  SignInButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from "@clerk/nextjs";
+import { HeaderNavButtons } from "@/components/layout/header-nav-buttons";
 import { format, addDays, startOfToday, isSameDay, isSaturday, isSunday, differenceInDays } from "date-fns";
 import { MobileDatePickerModal } from "@/components/filters/mobile-date-picker-modal";
 import { DayPicker } from "react-day-picker";
@@ -71,56 +62,7 @@ export function Header({ cinemas }: HeaderProps) {
           </Link>
 
           {/* Navigation Icons */}
-          <div className="flex items-center gap-1">
-            <Link href="/reachable" title="What Can I Catch?">
-              <IconButton
-                variant="ghost"
-                size="sm"
-                icon={<Navigation className="w-5 h-5" />}
-                label="What Can I Catch?"
-              />
-            </Link>
-            <Link href="/watchlist">
-              <IconButton
-                variant="ghost"
-                size="sm"
-                icon={<Heart className="w-5 h-5" />}
-                label="Watchlist"
-              />
-            </Link>
-            <MapFilterButton mounted={mounted} />
-            <Link href="/settings">
-              <IconButton
-                variant="ghost"
-                size="sm"
-                icon={<Settings className="w-5 h-5" />}
-                label="Settings"
-              />
-            </Link>
-            {/* Auth UI - only render after hydration to prevent mismatch */}
-            {mounted && (
-              <>
-                <SignedOut>
-                  <SignInButton mode="modal">
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-background-hover">
-                      <User className="w-4 h-4" />
-                      <span className="hidden sm:inline">Sign In</span>
-                    </button>
-                  </SignInButton>
-                </SignedOut>
-                <SignedIn>
-                  <UserButton
-                    afterSignOutUrl="/"
-                    appearance={{
-                      elements: {
-                        avatarBox: "w-8 h-8",
-                      },
-                    }}
-                  />
-                </SignedIn>
-              </>
-            )}
-          </div>
+          <HeaderNavButtons mounted={mounted} />
         </div>
       </div>
 
@@ -1060,29 +1002,6 @@ function CinemaFilter({ cinemas, mounted }: { cinemas: Cinema[]; mounted: boolea
         </div>
       )}
     </div>
-  );
-}
-
-// Map Filter Button - shows active state when map area is set
-function MapFilterButton({ mounted }: { mounted: boolean }) {
-  const { mapArea, useMapFiltering } = usePreferences();
-  const isActive = mounted && useMapFiltering && mapArea !== null;
-
-  return (
-    <Link href="/map" className="relative">
-      <IconButton
-        variant="ghost"
-        size="sm"
-        icon={<MapPin className="w-5 h-5" />}
-        label="Cinema Map"
-        className={cn(
-          isActive && "text-accent-primary"
-        )}
-      />
-      {isActive && (
-        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-accent-primary rounded-full" />
-      )}
-    </Link>
   );
 }
 

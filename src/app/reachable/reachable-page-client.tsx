@@ -10,6 +10,7 @@ import Link from "next/link";
 import { ArrowLeft, MapPin, Loader2 } from "lucide-react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { useReachable, areTravelTimesFresh } from "@/stores/reachable";
+import { useDiscovery } from "@/stores/discovery";
 import { fetchTravelTimes, getReachableScreenings } from "@/lib/travel-time";
 import { PostcodeInput } from "@/components/reachable/postcode-input";
 import { DeadlinePicker } from "@/components/reachable/deadline-picker";
@@ -82,6 +83,11 @@ export function ReachablePageClient({
 
   // Local state for input validation
   const [postcodeError, setPostcodeError] = useState<string | null>(null);
+
+  // Track that user has visited this feature (for discovery banner)
+  useEffect(() => {
+    useDiscovery.getState().markFeatureVisited("reachable");
+  }, []);
 
   // Check if we need to recalculate travel times
   const needsCalculation =

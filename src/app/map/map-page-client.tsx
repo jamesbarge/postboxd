@@ -14,6 +14,7 @@ import { CinemaMap } from "@/components/map/cinema-map";
 import { usePreferences } from "@/stores/preferences";
 import { useFilters } from "@/stores/filters";
 import { useHydrated } from "@/hooks/useHydrated";
+import { useDiscovery } from "@/stores/discovery";
 import { getCinemasInArea } from "@/lib/geo-utils";
 import type { CinemaCoordinates } from "@/types/cinema";
 import type { MapArea } from "@/lib/geo-utils";
@@ -38,6 +39,11 @@ export function MapPageClient({ cinemas }: MapPageClientProps) {
   // Local state for editing (doesn't save until "Apply")
   const [localArea, setLocalArea] = useState<MapArea | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Track that user has visited this feature (for discovery banner)
+  useEffect(() => {
+    useDiscovery.getState().markFeatureVisited("map");
+  }, []);
 
   // Initialize local state from store
   useEffect(() => {
