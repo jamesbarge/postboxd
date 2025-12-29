@@ -99,20 +99,20 @@ export function HeaderNavButtons({ mounted }: HeaderNavButtonsProps) {
         label="Festivals"
       />
 
-      {/* Watchlist - Standard Feature, Icon Only */}
-      <IconNavButton
-        href="/watchlist"
-        icon={<Heart className="w-5 h-5" />}
-        label="Watchlist"
-      />
-
-      {/* Cinema Map - Key Feature with Label */}
+      {/* Map - Key Feature with Label */}
       <LabeledNavButton
         href="/map"
         icon={<MapPin className="w-4 h-4 sm:w-4 sm:h-4" />}
-        label="Cinema Map"
+        label="Map"
         isActive={mapIsActive}
         hasIndicator={mapIsActive}
+      />
+
+      {/* Watchlist - with Label */}
+      <LabeledNavButton
+        href="/watchlist"
+        icon={<Heart className="w-4 h-4 sm:w-4 sm:h-4" />}
+        label="Watchlist"
       />
 
       {/* Settings - Utility, Icon Only */}

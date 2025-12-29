@@ -7,7 +7,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { Navigation, MapPin, X, Sparkles } from "lucide-react";
+import { Navigation, X } from "lucide-react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { useDiscovery } from "@/stores/discovery";
 import { Card } from "@/components/ui/card";
@@ -76,12 +76,9 @@ export function FeatureDiscoveryBanner() {
       <div className="px-4 sm:px-6 lg:px-8 py-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-accent-primary" />
-            <span className="text-sm font-medium text-text-primary">
-              Discover Features
-            </span>
-          </div>
+          <span className="text-sm font-medium text-text-primary">
+            Discover Features
+          </span>
           <button
             onClick={handleDismiss}
             className="p-1.5 rounded-lg hover:bg-background-hover text-text-tertiary hover:text-text-primary transition-colors"
@@ -91,23 +88,14 @@ export function FeatureDiscoveryBanner() {
           </button>
         </div>
 
-        {/* Feature Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <FeatureCard
-            href="/reachable"
-            icon={<Navigation className="w-5 h-5" />}
-            title="What Can I Catch?"
-            description="Find films that fit your schedule. Enter your location and deadline — we'll show you what you can reach in time."
-            feature="reachable"
-          />
-          <FeatureCard
-            href="/map"
-            icon={<MapPin className="w-5 h-5" />}
-            title="Cinema Map"
-            description="Draw an area on the map and see only screenings at cinemas in your neighbourhood."
-            feature="map"
-          />
-        </div>
+        {/* Feature Card */}
+        <FeatureCard
+          href="/reachable"
+          icon={<Navigation className="w-5 h-5" />}
+          title="What Can I Catch?"
+          description="Find films that fit your schedule. Enter your location and deadline — we'll show you what you can reach in time."
+          feature="reachable"
+        />
       </div>
     </div>
   );
