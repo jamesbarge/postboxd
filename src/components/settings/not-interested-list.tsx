@@ -11,6 +11,10 @@ import { useFilmStatus } from "@/stores/film-status";
 import { Button } from "@/components/ui";
 import { RotateCcw, Film } from "lucide-react";
 
+// Blur placeholder for poster images to prevent CLS
+const POSTER_BLUR =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAPCAYAAADd/14OAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAKklEQVQoz2Nk+M/AQAxgZGBg+M9AB2BkYGBgZGRgYGCgF2D4T7wexAAGABPmAhHXnXDuAAAAAElFTkSuQmCC";
+
 export function NotInterestedList() {
   const { getNotInterestedFilms, removeFilm } = useFilmStatus();
   const [mounted, setMounted] = useState(false);
@@ -21,19 +25,21 @@ export function NotInterestedList() {
   }, []);
 
   // Don't render until mounted to avoid hydration mismatch
+  // Skeleton dimensions match actual content to prevent CLS
   if (!mounted) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         {[1, 2, 3].map((i) => (
           <div
             key={i}
             className="flex items-center gap-4 p-3 rounded-lg bg-background-secondary border border-border-subtle animate-pulse"
           >
-            <div className="w-12 h-18 bg-background-tertiary rounded" />
-            <div className="flex-1">
+            <div className="w-10 h-[60px] bg-background-tertiary rounded shrink-0" />
+            <div className="flex-1 min-w-0">
               <div className="h-4 bg-background-tertiary rounded w-32 mb-2" />
               <div className="h-3 bg-background-tertiary rounded w-24" />
             </div>
+            <div className="w-20 h-8 bg-background-tertiary rounded shrink-0" />
           </div>
         ))}
       </div>
@@ -68,7 +74,7 @@ export function NotInterestedList() {
           className="flex items-center gap-4 p-3 rounded-lg bg-background-secondary border border-border-subtle hover:border-border-default transition-colors"
         >
           {/* Poster thumbnail */}
-          <div className="relative w-10 h-15 rounded overflow-hidden bg-background-tertiary shrink-0">
+          <div className="relative w-10 h-[60px] rounded overflow-hidden bg-background-tertiary shrink-0">
             {film.posterUrl ? (
               <Image
                 src={film.posterUrl}
@@ -76,6 +82,8 @@ export function NotInterestedList() {
                 fill
                 className="object-cover"
                 sizes="40px"
+                placeholder="blur"
+                blurDataURL={POSTER_BLUR}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
