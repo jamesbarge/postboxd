@@ -41,6 +41,7 @@ interface CinemaWithCoords {
   name: string;
   shortName: string | null;
   coordinates: { lat: number; lng: number } | null;
+  chain: string | null;
 }
 
 interface CalendarViewWithLoaderProps {

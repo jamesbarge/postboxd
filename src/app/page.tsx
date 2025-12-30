@@ -115,12 +115,13 @@ export default async function Home() {
     getCachedStats(),
   ]);
 
-  // Prepare cinemas with coordinates for map filtering
+  // Prepare cinemas with coordinates for map filtering and venue type filtering
   const cinemasWithCoords = allCinemas.map(c => ({
     id: c.id,
     name: c.name,
     shortName: c.shortName,
     coordinates: c.coordinates,
+    chain: c.chain,
   }));
 
   // Generate FAQ items for GEO (AI citations)
@@ -147,7 +148,7 @@ export default async function Home() {
 
       {/* Unified Header with Filters */}
       <Header
-        cinemas={allCinemas.map(c => ({ id: c.id, name: c.name, shortName: c.shortName }))}
+        cinemas={allCinemas.map(c => ({ id: c.id, name: c.name, shortName: c.shortName, chain: c.chain }))}
         festivals={activeFestivals}
       />
 

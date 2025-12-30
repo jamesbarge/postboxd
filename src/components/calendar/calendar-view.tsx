@@ -8,7 +8,7 @@
 import { useMemo } from "react";
 import { startOfDay, endOfDay, format, isWithinInterval, getHours } from "date-fns";
 import { DaySection } from "./day-section";
-import { useFilters, getTimeOfDayFromHour } from "@/stores/filters";
+import { useFilters, getTimeOfDayFromHour, isIndependentCinema } from "@/stores/filters";
 import { useFilmStatus } from "@/stores/film-status";
 import { usePreferences } from "@/stores/preferences";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -52,6 +52,7 @@ interface CinemaWithCoords {
   name: string;
   shortName: string | null;
   coordinates: { lat: number; lng: number } | null;
+  chain: string | null;
 }
 
 interface CalendarViewProps {
@@ -116,6 +117,18 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
       // Cinema filter (includes map area selection - cinemaIds is set by map page)
       if (filters.cinemaIds.length > 0 && !filters.cinemaIds.includes(s.cinema.id)) {
         return false;
+      }
+
+      // Venue type filter (independent vs chain)
+      if (filters.venueType !== "all") {
+        const cinema = cinemas.find(c => c.id === s.cinema.id);
+        const isIndependent = cinema ? isIndependentCinema(cinema.chain) : true;
+        if (filters.venueType === "independent" && !isIndependent) {
+          return false;
+        }
+        if (filters.venueType === "chain" && isIndependent) {
+          return false;
+        }
       }
 
       // Date range filter
@@ -204,7 +217,7 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
 
       return true;
     });
-  }, [screenings, filters, hiddenFilmIds, mounted]);
+  }, [screenings, filters, hiddenFilmIds, mounted, cinemas]);
 
   const activeFilterCount = mounted ? filters.getActiveFilterCount() : 0;
 
