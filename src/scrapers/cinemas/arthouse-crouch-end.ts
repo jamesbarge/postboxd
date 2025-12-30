@@ -5,29 +5,31 @@
  * Cinema: ArtHouse Crouch End
  * Address: 159A Tottenham Lane, London N8 9BT
  * Website: https://www.arthousecrouchend.co.uk
- * Booking: http://arthousecrouchend.savoysystems.co.uk/ArthouseCrouchEnd.dll/
+ * Booking: https://arthousecrouchend.savoysystems.co.uk/ArtHouseCrouchEnd.dll/
+ *
+ * HTML Structure:
+ * - Each film is in a <div class="programme"> container
+ * - Film title: <h1 class="title"><a href="...TcsProgramme_...">Title</a></h1>
+ * - Showtimes in <div class="showtimes"> containing table rows:
+ *   - <td class="PeformanceListDate">Tuesday 30 Dec 2025</td>
+ *   - <td class="PeformanceListTimes"> with <a href="...TcsPerformance_...">11:45am</a>
  */
 
 import { BaseScraper } from "../base";
 import type { RawScreening, ScraperConfig } from "../types";
-import {
-  parseScreeningDate,
-  parseScreeningTime,
-  combineDateAndTime,
-} from "../utils/date-parser";
+import { parseScreeningDate } from "../utils/date-parser";
 import type { CheerioAPI } from "../utils/cheerio-types";
 
 export class ArtHouseCrouchEndScraper extends BaseScraper {
   config: ScraperConfig = {
     cinemaId: "arthouse-crouch-end",
-    baseUrl: "http://arthousecrouchend.savoysystems.co.uk",
+    baseUrl: "https://arthousecrouchend.savoysystems.co.uk",
     requestsPerMinute: 6,
     delayBetweenRequests: 2000,
   };
 
   protected async fetchPages(): Promise<string[]> {
-    // The Savoy Systems page shows all current films and showtimes on a single page
-    const url = this.config.baseUrl + "/ArthouseCrouchEnd.dll/";
+    const url = this.config.baseUrl + "/ArtHouseCrouchEnd.dll/";
     console.log("[" + this.config.cinemaId + "] Fetching listings: " + url);
 
     const html = await this.fetchUrl(url);
@@ -57,127 +59,55 @@ export class ArtHouseCrouchEndScraper extends BaseScraper {
     const screenings: RawScreening[] = [];
     const now = new Date();
 
-    // Find all programme sections using TcsProgramme_ links (film titles)
-    const filmLinks = $('a[href*="TcsProgramme_"]');
-    const processedFilms = new Set<string>();
+    // Find all programme containers (each contains one film)
+    const programmes = $("div.programme");
+    console.log("[" + this.config.cinemaId + "] Found " + programmes.length + " films");
 
-    filmLinks.each((_, el) => {
-      const $link = $(el);
-      const filmTitle = this.cleanTitle($link.text().trim());
+    programmes.each((_, prog) => {
+      const $prog = $(prog);
 
-      if (!filmTitle || processedFilms.has(filmTitle)) return;
-      processedFilms.add(filmTitle);
+      // Get film title from the TcsProgramme link
+      const titleLink = $prog.find('a[href*="TcsProgramme_"]').first();
+      const rawTitle = titleLink.text().trim();
+      if (!rawTitle) return;
 
-      // Find the parent container for this film to get all its performances
-      const $container = $link.closest("table, .programme, div").first();
+      const filmTitle = this.cleanTitle(rawTitle);
 
-      if ($container.length === 0) {
-        this.parseFilmPerformancesFromSiblings($, $link, filmTitle, screenings, now);
-      } else {
-        this.parseFilmPerformances($, $container, filmTitle, screenings, now);
-      }
-    });
+      // Find all date cells in the showtimes section
+      const dateCells = $prog.find("td.PeformanceListDate");
 
-    // Alternative parsing if main approach found nothing
-    if (screenings.length === 0) {
-      console.log("[" + this.config.cinemaId + "] Trying alternative parsing approach...");
-      this.parseAlternativeStructure($, screenings, now);
-    }
+      dateCells.each((_, dateCell) => {
+        const dateText = $(dateCell).text().trim();
+        const parsedDate = parseScreeningDate(dateText);
 
-    return screenings;
-  }
+        if (!parsedDate) {
+          console.warn("[" + this.config.cinemaId + "] Could not parse date: " + dateText);
+          return;
+        }
 
-  private parseFilmPerformances(
-    $: CheerioAPI,
-    $container: ReturnType<CheerioAPI>,
-    filmTitle: string,
-    screenings: RawScreening[],
-    now: Date
-  ): void {
-    let currentDate: Date | null = null;
+        // Find performance links in the sibling td.PeformanceListTimes
+        const timeCell = $(dateCell).siblings("td.PeformanceListTimes");
+        const perfLinks = timeCell.find('a[href*="TcsPerformance"]');
 
-    // Look for all text nodes and links within the container
-    $container.find("*").each((_, el) => {
-      const $el = $(el);
-      const text = $el.text().trim();
+        perfLinks.each((_, perfLink) => {
+          const $perf = $(perfLink);
+          const timeText = $perf.text().trim(); // e.g., "11:45am", "2:30pm"
+          const bookingUrl = $perf.attr("href") || "";
 
-      // Check if this is a date line (contains day name and date)
-      const dateMatch = text.match(
-        /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+\d{1,2}\s+\w+\s*\d*$/i
-      );
+          // Parse the time (format: "11:45am" or "2:30pm")
+          const datetime = this.parseTimeWithAmPm(parsedDate, timeText);
 
-      if (dateMatch) {
-        currentDate = parseScreeningDate(text);
-        return;
-      }
+          if (!datetime) {
+            console.warn("[" + this.config.cinemaId + "] Could not parse time: " + timeText);
+            return;
+          }
 
-      // Check if this is a time link (format: "1:30", "7:00", "14:45", etc.)
-      if ($el.is("a") && /^\d{1,2}:\d{2}$/.test(text)) {
-        if (!currentDate) return;
-
-        const time = parseScreeningTime(text);
-        if (!time) return;
-
-        const datetime = combineDateAndTime(currentDate, time);
-
-        // Skip past screenings
-        if (datetime < now) return;
-
-        // Get booking URL
-        const href = $el.attr("href") || "";
-        const bookingUrl = href.startsWith("http")
-          ? href
-          : this.config.baseUrl + (href.startsWith("/") ? "" : "/") + href;
-
-        screenings.push({
-          filmTitle,
-          datetime,
-          bookingUrl: bookingUrl || this.config.baseUrl + "/ArthouseCrouchEnd.dll/",
-          sourceId: "arthouse-" + filmTitle.toLowerCase().replace(/\s+/g, "-") + "-" + datetime.toISOString(),
-        });
-      }
-    });
-  }
-
-  private parseFilmPerformancesFromSiblings(
-    $: CheerioAPI,
-    $filmLink: ReturnType<CheerioAPI>,
-    filmTitle: string,
-    screenings: RawScreening[],
-    now: Date
-  ): void {
-    let currentDate: Date | null = null;
-    let $current = $filmLink.parent().next();
-
-    // Walk through siblings until we hit another film link
-    while ($current.length > 0 && $current.find('a[href*="TcsProgramme_"]').length === 0) {
-      const text = $current.text().trim();
-
-      // Check for date
-      const dateMatch = text.match(
-        /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+\d{1,2}\s+\w+\s*\d*/i
-      );
-
-      if (dateMatch) {
-        currentDate = parseScreeningDate(text);
-      }
-
-      // Find time links
-      $current.find("a").each((_, el) => {
-        const $el = $(el);
-        const timeText = $el.text().trim();
-
-        if (/^\d{1,2}:\d{2}$/.test(timeText) && currentDate) {
-          const time = parseScreeningTime(timeText);
-          if (!time) return;
-
-          const datetime = combineDateAndTime(currentDate, time);
+          // Skip past screenings
           if (datetime < now) return;
 
-          const href = $el.attr("href") || "";
-          const bookingUrl = href.startsWith("http")
-            ? href
-            : this.config.baseUrl + (href.startsWith("/") ? "" : "/") + href;
+          // Check for "(Closed for Booking)" status in parent span
+          const parentText = $perf.parent().text().toLowerCase();
+          if (parentText.includes("closed for booking")) return;
 
           screenings.push({
             filmTitle,
@@ -185,78 +115,37 @@ export class ArtHouseCrouchEndScraper extends BaseScraper {
             bookingUrl: bookingUrl || this.config.baseUrl + "/ArthouseCrouchEnd.dll/",
             sourceId: "arthouse-" + filmTitle.toLowerCase().replace(/\s+/g, "-") + "-" + datetime.toISOString(),
           });
-        }
-      });
-
-      $current = $current.next();
-    }
-  }
-
-  private parseAlternativeStructure(
-    $: CheerioAPI,
-    screenings: RawScreening[],
-    now: Date
-  ): void {
-    let currentFilm: string | null = null;
-    let currentDate: Date | null = null;
-
-    // Get all text and links in order
-    $("body").find("a, td, tr").each((_, el) => {
-      const $el = $(el);
-
-      // Check for film link (contains TcsProgramme_)
-      if ($el.is("a") && $el.attr("href")?.includes("TcsProgramme_")) {
-        currentFilm = this.cleanTitle($el.text().trim());
-        currentDate = null;
-        return;
-      }
-
-      // Check for date text
-      const text = $el.text().trim();
-      const dateMatch = text.match(
-        /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+\d{1,2}\s+\w+\s*\d*$/i
-      );
-
-      if (dateMatch && currentFilm) {
-        currentDate = parseScreeningDate(text);
-        return;
-      }
-
-      // Check for time link
-      if ($el.is("a") && /^\d{1,2}:\d{2}$/.test(text)) {
-        if (!currentFilm || !currentDate) return;
-
-        const time = parseScreeningTime(text);
-        if (!time) return;
-
-        const datetime = combineDateAndTime(currentDate, time);
-        if (datetime < now) return;
-
-        const href = $el.attr("href") || "";
-        const bookingUrl = href.startsWith("http")
-          ? href
-          : this.config.baseUrl + (href.startsWith("/") ? "" : "/") + href;
-
-        // Check for "(Closed for Booking)" status
-        const parentText = $el.parent().text();
-        if (parentText.toLowerCase().includes("closed for booking")) {
-          return;
-        }
-
-        screenings.push({
-          filmTitle: currentFilm,
-          datetime,
-          bookingUrl: bookingUrl || this.config.baseUrl + "/ArthouseCrouchEnd.dll/",
-          sourceId: "arthouse-" + currentFilm.toLowerCase().replace(/\s+/g, "-") + "-" + datetime.toISOString(),
         });
-      }
+      });
     });
 
-    if (screenings.length > 0) {
-      console.log(
-        "[" + this.config.cinemaId + "] Alternative parsing found " + screenings.length + " screenings"
-      );
+    return screenings;
+  }
+
+  /**
+   * Parse time in format "11:45am" or "2:30pm" and combine with date
+   */
+  private parseTimeWithAmPm(date: Date, timeStr: string): Date | null {
+    // Match "11:45am", "2:30pm", etc.
+    const match = timeStr.match(/^(\d{1,2}):(\d{2})(am|pm)$/i);
+    if (!match) return null;
+
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const period = match[3].toLowerCase();
+
+    // Convert to 24-hour format
+    if (period === "pm" && hours !== 12) {
+      hours += 12;
+    } else if (period === "am" && hours === 12) {
+      hours = 0;
     }
+
+    // Create datetime by copying date and setting time
+    const datetime = new Date(date);
+    datetime.setHours(hours, minutes, 0, 0);
+
+    return datetime;
   }
 
   private cleanTitle(title: string): string {

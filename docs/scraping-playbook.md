@@ -24,6 +24,7 @@ This document describes how each cinema website is scraped, including the approa
 | **Close-Up Cinema** | Embedded JSON | No | `closeupfilmcentre.com` homepage | Working |
 | **Cine Lumiere** | Single page | No | `cinelumiere.savoysystems.co.uk/CineLumiere.dll/` | Working |
 | **Castle Cinema** | JSON-LD | No | `thecastlecinema.com` homepage | Working |
+| **ArtHouse Crouch End** | HTML (Savoy) | No | `arthousecrouchend.savoysystems.co.uk/.dll/` | Working |
 
 ---
 
@@ -548,6 +549,39 @@ west_norwood: 10099, ealing: 10107
 - JSON-LD is the cleanest data source possible - no HTML parsing needed
 - Duration in ISO 8601 format (PT133M = 133 minutes)
 - Also manages Catford Storyteller cinema (may share booking system)
+
+---
+
+### 17. ArtHouse Crouch End
+
+**File:** `src/scrapers/cinemas/arthouse-crouch-end.ts`
+
+**Approach:**
+- Single page fetch from Savoy Systems booking page
+- No browser needed - standard HTML parsing with Cheerio
+- Similar platform to Ciné Lumière (Savoy Systems) but different HTML structure
+
+**URL:** `https://arthousecrouchend.savoysystems.co.uk/ArtHouseCrouchEnd.dll/`
+
+**HTML Structure:**
+- Each film is in a `<div class="programme">` container
+- Film title: `<h1 class="title"><a href="...TcsProgramme_...">Title</a></h1>`
+- Showtimes in `<div class="showtimes">` containing table rows
+- Date cells: `<td class="PeformanceListDate">Tuesday 30 Dec 2025</td>`
+- Time links: `<td class="PeformanceListTimes"><a href="...TcsPerformance_...">11:45am</a></td>`
+
+**Date Format:** "Tuesday 30 Dec 2025" (uses shared `parseScreeningDate`)
+
+**Time Format:** "11:45am" or "2:30pm" - 12-hour with AM/PM suffix
+
+**Booking URL Pattern:** Contains `TcsPerformance_{id}` in URL path
+
+**Notes:**
+- 2-screen community cinema in former Salvation Army Hall (opened 2014)
+- Uses Savoy Systems (same vendor as Ciné Lumière, The Lexi) but HTML structure differs
+- Time format includes AM/PM (unlike Ciné Lumière which uses 24-hour)
+- `TcsProgramme_` links = film info pages, `TcsPerformance_` links = booking pages
+- Some films have multiple dates with multiple showtimes per date
 
 ---
 
