@@ -178,8 +178,8 @@ export function getReachableScreenings(
     });
   }
 
-  // Sort by when user needs to leave (soonest first)
-  return reachable.sort((a, b) => a.minutesUntilLeave - b.minutesUntilLeave);
+  // Sort by shortest travel time (closest cinemas first)
+  return reachable.sort((a, b) => a.travelMinutes - b.travelMinutes);
 }
 
 /**
