@@ -162,9 +162,8 @@ export default async function Home() {
         </h1>
         {/* Answer-first summary for GEO - visible but subtle */}
         <p className="text-sm text-text-tertiary mb-4 max-w-2xl">
-          Find screenings at {stats.cinemaCount} London independent cinemas.{" "}
-          {stats.uniqueFilms} films with {stats.totalScreenings} upcoming
-          screenings. Updated daily.
+          Find screenings at {stats.cinemaCount} London cinemas (independent and chains).{" "}
+          {stats.uniqueFilms} films with {stats.totalScreenings} upcoming screenings. Updated daily.
         </p>
       </div>
 
