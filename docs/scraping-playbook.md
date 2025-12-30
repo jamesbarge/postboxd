@@ -26,6 +26,7 @@ This document describes how each cinema website is scraped, including the approa
 | **Castle Cinema** | JSON-LD | No | `thecastlecinema.com` homepage | Working |
 | **ArtHouse Crouch End** | HTML (Savoy) | No | `arthousecrouchend.savoysystems.co.uk/.dll/` | Working |
 | **Phoenix Cinema** | GraphQL (INDY) | Playwright | `phoenixcinema.co.uk/graphql` | Working |
+| **Rich Mix** | JSON API | No | `richmix.org.uk/whats-on/cinema/?ajax=1&json=1` | Working |
 
 ---
 
@@ -689,6 +690,52 @@ const datetime = parseUKLocalDateTime(item.screeningDate);
 ```
 
 This parses the datetime components directly, avoiding any timezone confusion regardless of where the scraper runs.
+
+---
+
+### 19. Rich Mix
+
+**File:** `src/scrapers/cinemas/rich-mix.ts`
+
+**Approach:**
+- Uses WordPress JSON API with `?ajax=1&json=1` query parameter
+- Returns array of film objects with Spektrix ticketing data embedded
+- No browser needed - pure fetch
+- Ticketing via Spektrix (tickets.richmix.org.uk)
+
+**API URL:** `https://richmix.org.uk/whats-on/cinema/?ajax=1&json=1`
+
+**Response Structure:**
+```json
+{
+  "post_title": "AVATAR: Fire and Ash 2D",
+  "slug": "avatar-fire-and-ash",
+  "_spectrix_id": "776202ARSQNSKGTGPHCCKQDHNQVKJNGCK",
+  "spektrix_data": {
+    "instances": {
+      "today": [...],
+      "tomorrow": [...],
+      "Fri 2 Jan": [...]
+    }
+  }
+}
+```
+
+**Date Format:**
+- Instance start times: `"2025-12-30 14:30:00"` (UK local time)
+- Date keys are human-readable: "today", "tomorrow", "Fri 2 Jan", etc.
+
+**Instance Fields:**
+- `id` / `instanceId` - unique screening ID
+- `start` - datetime string (UK local)
+- `onSale` - "1" if tickets available
+- `cancelled` - "1" if cancelled
+- `status.name` - screen info ("Screen 1", "Screen 2", etc.)
+
+**Known Issues:**
+- Website occasionally shows "technical issue" notice for booking
+- Spektrix data still loads even when booking disabled
+- Some films are events/festivals without standard pricing
 
 ---
 
