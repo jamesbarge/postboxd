@@ -30,6 +30,8 @@ This document describes how each cinema website is scraped, including the approa
 | **Rich Mix** | JSON API | No | `richmix.org.uk/whats-on/cinema/?ajax=1&json=1` | Working |
 | **Regent Street Cinema** | GraphQL (INDY) | Playwright | `regentstreetcinema.com/graphql` | Working |
 | **Riverside Studios** | AJAX API | No | `riversidestudios.co.uk/ajax/filter_stream/` | Working |
+| **Olympic Studios** | HTML parse | No | `olympiccinema.com/whats-on` | Working |
+| **David Lean Cinema** | HTML parse | No | `davidleancinema.org.uk/listings` | Working |
 
 ---
 
@@ -793,6 +795,81 @@ This parses the datetime components directly, avoiding any timezone confusion re
 - Page uses Quasar (Vue) framework - fully dynamic rendering
 - Multiple GraphQL calls happen on page load
 - Need to wait for all showingsForDate responses (3-5 batches typical)
+
+---
+
+### 21. Olympic Studios
+
+**File:** `src/scrapers/cinemas/olympic.ts`
+
+**Approach:**
+- Single page fetch from `/whats-on`
+- No browser needed - standard HTML parsing with Cheerio
+- Uses Empire/MyCloudCinema booking system
+- Date headers followed by film cards with showtime buttons
+
+**URL:** `https://www.olympiccinema.com/whats-on`
+
+**HTML Structure:**
+- Date headers: `<h3 class="date-day">Tuesday December 30</h3>`
+- Films container: `.row` sibling after date header
+- Film cards: `.col-md-12` divs within row
+- Title: `a.text-decoration-none.text-black`
+- Showtimes: `a.btn` with `.btn-times-fs` span for time
+
+**Date Format:** "Tuesday December 30" (day name + month name + day number)
+
+**Time Format:** "15:30" - already in 24-hour format
+
+**Booking URL Pattern:** `https://empire.mycloudcinema.com/book/{id}`
+
+**Notes:**
+- Luxury cinema in Barnes (SW London) with 3 screens
+- Housed in former Olympic Sound Studios (famous recording studio)
+- Year rollover handling: if parsed date is in the past and month < current month, adds 1 year
+- Empire/MyCloudCinema is same booking platform as other premium venues
+
+---
+
+### 22. David Lean Cinema
+
+**File:** `src/scrapers/cinemas/david-lean.ts`
+
+**Approach:**
+- Single page fetch from `/listings`
+- No browser needed - standard HTML parsing with Cheerio
+- WordPress site with Elementor - film cards in figure elements
+- Uses TicketSolve for booking (via tinyurl redirects)
+
+**URL:** `https://www.davidleancinema.org.uk/listings`
+
+**HTML Structure:**
+- Film figures: `<figure class="wp-caption">`
+- Title: `<img alt="Film Title">` (from image alt attribute)
+- Booking link: `<a href="...">` wrapping the image
+- Date/time: `<figcaption>Tues 06 Jan at 2.30pm and 7.30pm (HOH)</figcaption>`
+
+**Date Format:** "Tues 06 Jan at 2.30pm" (abbreviated day + DD Mon + time)
+
+**Time Format:**
+- 12-hour with periods: "2.30pm", "11am", "7.30pm"
+- Normalized to 24-hour internally
+- Multiple times: "2.30pm and 7.30pm" creates separate screenings
+
+**Caption Annotations:**
+- `(DF)` - Descriptive subtitles (visually impaired)
+- `(HOH)` - Hard of hearing subtitles
+- `(BIA)` - Brought in by audience
+- These are stripped during parsing
+
+**Booking URL Pattern:** TinyURL redirects to TicketSolve
+
+**Notes:**
+- Community cinema in Croydon Clocktower (South London)
+- Named after director David Lean (Lawrence of Arabia, Brief Encounter)
+- Single screen, ~100 seats
+- Multiple showtimes per day listed in single caption
+- Year rollover: if parsed date < now, adds 1 year
 
 ---
 
