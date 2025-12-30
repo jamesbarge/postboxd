@@ -204,7 +204,7 @@ export const EVERYMAN_VENUES: VenueConfig[] = [
     postcode: "E17 7JN",
     address: "186 Hoe Street",
     features: ["bar"],
-    active: true,
+    active: false, // Venue no longer in Everyman's system
   },
 ];
 
