@@ -67,6 +67,10 @@ export function FeatureDiscoveryBanner() {
   };
 
   // Don't render during SSR or if banner should be hidden
+  // CLS Note: We intentionally DON'T reserve space here because:
+  // 1. Returning users (majority of traffic) have dismissed/visited features
+  // 2. Showing a placeholder for them would cause MORE CLS (placeholder → nothing)
+  // 3. New users see a one-time CLS when banner appears, but this is acceptable
   if (!hydrated || !shouldShow) {
     return null;
   }
