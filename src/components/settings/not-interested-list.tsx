@@ -7,9 +7,11 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import { useUser } from "@clerk/nextjs";
 import { useFilmStatus } from "@/stores/film-status";
 import { Button } from "@/components/ui";
 import { RotateCcw, Film } from "lucide-react";
+import { deleteFilmStatus } from "@/lib/sync/user-sync-service";
 
 // Blur placeholder for poster images to prevent CLS
 const POSTER_BLUR =
@@ -18,6 +20,7 @@ const POSTER_BLUR =
 export function NotInterestedList() {
   const { getNotInterestedFilms, removeFilm } = useFilmStatus();
   const [mounted, setMounted] = useState(false);
+  const { isSignedIn } = useUser();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Standard hydration pattern
@@ -63,7 +66,13 @@ export function NotInterestedList() {
   }
 
   const handleRestore = (filmId: string) => {
+    // Optimistically remove locally
     removeFilm(filmId);
+
+    // If signed in, also delete from server so it doesn't reappear after sync
+    if (isSignedIn) {
+      void deleteFilmStatus(filmId);
+    }
   };
 
   return (
