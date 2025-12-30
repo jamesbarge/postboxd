@@ -116,7 +116,7 @@ export function FestivalCard({ festival }: FestivalCardProps) {
           )}
 
           {/* Meta info row */}
-          <div className="flex flex-wrap gap-3 text-xs text-text-tertiary">
+          <div className="flex flex-wrap gap-3 text-xs text-text-tertiary mb-3">
             {/* Venues */}
             {festival.venues && festival.venues.length > 0 && (
               <span className="inline-flex items-center gap-1">
@@ -126,30 +126,24 @@ export function FestivalCard({ festival }: FestivalCardProps) {
                   : `${festival.venues.length} venues`}
               </span>
             )}
-
-            {/* Genre focus */}
-            {festival.genreFocus && festival.genreFocus.length > 0 && (
-              <span className="inline-flex items-center gap-1 capitalize">
-                {festival.genreFocus.slice(0, 2).join(", ")}
-                {festival.genreFocus.length > 2 && ` +${festival.genreFocus.length - 2}`}
-              </span>
-            )}
           </div>
 
-          {/* Ticket status */}
-          {ticketBadge && (
-            <div className="mt-3 flex items-center gap-2">
-              <Ticket className="w-4 h-4 text-text-tertiary" />
-              <Badge variant={ticketBadge.variant} size="sm">
-                {ticketBadge.text}
-              </Badge>
-              {festival.publicSaleDate && festival.ticketStatus !== "on_sale" && (
-                <span className="text-xs text-text-tertiary">
-                  Public: {format(new Date(festival.publicSaleDate), "MMM d")}
-                </span>
-              )}
-            </div>
-          )}
+          {/* Ticket status - fixed height to align separators */}
+          <div className="h-8">
+            {ticketBadge && (
+              <div className="flex items-center gap-2">
+                <Ticket className="w-4 h-4 text-text-tertiary" />
+                <Badge variant={ticketBadge.variant} size="sm">
+                  {ticketBadge.text}
+                </Badge>
+                {festival.publicSaleDate && festival.ticketStatus !== "on_sale" && (
+                  <span className="text-xs text-text-tertiary">
+                    Public: {format(new Date(festival.publicSaleDate), "MMM d")}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Link>
 
