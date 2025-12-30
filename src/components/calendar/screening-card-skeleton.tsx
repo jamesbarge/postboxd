@@ -1,6 +1,10 @@
 /**
  * Screening Card Skeleton
  * Loading placeholder for screening cards with shimmer animation
+ *
+ * IMPORTANT: This skeleton MUST match the exact structure of ScreeningCard
+ * to prevent Cumulative Layout Shift (CLS). Any changes to ScreeningCard
+ * layout should be reflected here.
  */
 
 import { cn } from "@/lib/cn";
@@ -13,40 +17,32 @@ export function ScreeningCardSkeleton({ className }: ScreeningCardSkeletonProps)
   return (
     <article
       className={cn(
-        "flex gap-4 p-4 rounded-lg",
-        "bg-background-secondary/50 border border-border-subtle",
+        // Match exact structure of ScreeningCard
+        "group relative flex flex-col rounded-lg overflow-hidden h-full",
+        "bg-background-secondary border border-border-subtle",
         className
       )}
       aria-hidden="true"
     >
-      {/* Poster skeleton */}
-      <div className="shrink-0 w-20 h-28 sm:w-24 sm:h-36 rounded-md skeleton" />
+      {/* Poster area - matches ScreeningCard poster container */}
+      <div className="relative aspect-[2/3] w-full overflow-hidden">
+        <div className="absolute inset-0 skeleton" />
+      </div>
 
-      {/* Content skeleton */}
-      <div className="flex-1 min-w-0 flex flex-col gap-2">
+      {/* Content - matches ScreeningCard content structure */}
+      <div className="flex flex-col flex-1 p-2">
+        {/* Time and Cinema row */}
+        <div className="flex items-center gap-2 mb-1">
+          <div className="h-3 w-10 rounded skeleton" />
+          <div className="h-2 w-1 rounded skeleton" />
+          <div className="h-3 w-16 rounded skeleton" />
+        </div>
+
         {/* Title */}
-        <div className="h-6 w-3/4 rounded skeleton" />
+        <div className="h-4 w-full rounded skeleton" />
 
         {/* Director */}
-        <div className="h-4 w-1/2 rounded skeleton" />
-
-        {/* Time & Cinema */}
-        <div className="flex items-center gap-2 mt-1">
-          <div className="h-4 w-12 rounded skeleton" />
-          <div className="h-4 w-16 rounded skeleton" />
-          <div className="h-4 w-14 rounded skeleton" />
-        </div>
-
-        {/* Badges */}
-        <div className="flex gap-1.5 mt-1">
-          <div className="h-5 w-12 rounded skeleton" />
-          <div className="h-5 w-16 rounded skeleton" />
-        </div>
-
-        {/* Button */}
-        <div className="mt-auto pt-2">
-          <div className="h-8 w-20 rounded-lg skeleton" />
-        </div>
+        <div className="h-3 w-2/3 rounded skeleton mt-0.5" />
       </div>
     </article>
   );
@@ -54,10 +50,15 @@ export function ScreeningCardSkeleton({ className }: ScreeningCardSkeletonProps)
 
 /**
  * Multiple skeleton cards for loading state
+ * Uses same grid layout as DaySection for consistency
  */
-export function ScreeningCardSkeletonList({ count = 3 }: { count?: number }) {
+export function ScreeningCardSkeletonList({ count = 12 }: { count?: number }) {
   return (
-    <div className="space-y-4" role="status" aria-label="Loading screenings">
+    <div
+      className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 py-6"
+      role="status"
+      aria-label="Loading screenings"
+    >
       {Array.from({ length: count }).map((_, i) => (
         <ScreeningCardSkeleton key={i} />
       ))}

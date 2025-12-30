@@ -122,29 +122,32 @@ export function HeaderNavButtons({ mounted }: HeaderNavButtonsProps) {
         label="Settings"
       />
 
-      {/* Auth UI - only render after hydration to prevent mismatch */}
-      {mounted && (
-        <>
-          <SignedOut>
-            <SignInButton mode="modal">
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-background-hover">
-                <User className="w-4 h-4" />
-                <span className="hidden sm:inline">Sign In</span>
-              </button>
-            </SignInButton>
-          </SignedOut>
-          <SignedIn>
-            <UserButton
-              afterSignOutUrl="/"
-              appearance={{
-                elements: {
-                  avatarBox: "w-8 h-8",
-                },
-              }}
-            />
-          </SignedIn>
-        </>
-      )}
+      {/* Auth UI - reserve space to prevent CLS during hydration */}
+      <div className="w-8 h-8 flex items-center justify-center">
+        {mounted ? (
+          <>
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className="flex items-center justify-center w-8 h-8 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-background-hover">
+                  <User className="w-5 h-5" />
+                </button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "w-8 h-8",
+                  },
+                }}
+              />
+            </SignedIn>
+          </>
+        ) : (
+          // Placeholder during SSR - same size as UserButton
+          <div className="w-8 h-8 rounded-full bg-background-tertiary" />
+        )}</div>
     </div>
   );
 }
