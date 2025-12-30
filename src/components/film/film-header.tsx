@@ -74,6 +74,7 @@ export function FilmHeader({ film }: FilmHeaderProps) {
             src={film.backdropUrl}
             alt=""
             fill
+            sizes="100vw"
             className={cn(
               "object-cover transition-all duration-1000 ease-out",
               "animate-ken-burns",
@@ -105,6 +106,7 @@ export function FilmHeader({ film }: FilmHeaderProps) {
                     src={film.posterUrl}
                     alt={film.title}
                     fill
+                    sizes="(max-width: 640px) 192px, 224px"
                     className={cn(
                       "object-cover transition-all duration-700 ease-out",
                       posterLoaded ? "opacity-100 scale-100" : "opacity-0 scale-105"
