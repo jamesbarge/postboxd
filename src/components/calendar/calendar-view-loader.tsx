@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { addDays, format, differenceInDays, startOfDay } from "date-fns";
+import { addDays, differenceInDays, startOfDay } from "date-fns";
 import { useSearchParams } from "next/navigation";
 import { CalendarView } from "./calendar-view";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { Loader2, ChevronDown, X, Sparkles } from "lucide-react";
+import { Loader2, X, Sparkles } from "lucide-react";
 import { useFilters } from "@/stores/filters";
 
 interface Screening {
@@ -89,6 +89,9 @@ export function CalendarViewWithLoader({ initialScreenings, cinemas }: CalendarV
   // Track load state (0 = initial 3 days, 1 = week 1 complete, 2-4 = additional weeks)
   const [loadState, setLoadState] = useState(0);
   const maxLoadState = 4; // Up to 4 weeks (28 days)
+
+  // Ref for the infinite scroll sentinel element
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Get date filter from store to auto-load when user selects future dates
   const dateTo = useFilters((state) => state.dateTo);
@@ -223,17 +226,37 @@ export function CalendarViewWithLoader({ initialScreenings, cinemas }: CalendarV
 
   const canLoadMore = loadState < maxLoadState;
 
-  const handleLoadMore = () => {
-    if (canLoadMore) {
+  const handleLoadMore = useCallback(() => {
+    if (canLoadMore && !isLoading) {
       setLoadState((s) => s + 1);
     }
-  };
+  }, [canLoadMore, isLoading]);
 
-  // Calculate what date range we're showing
-  // loadState 0 = 3 days, 1 = 7 days, 2 = 14 days, etc.
-  const daysShowing = loadState === 0 ? 3 : loadState * 7;
-  const endDate = addDays(new Date(), daysShowing);
-  const dateLabel = format(endDate, "d MMMM");
+  // Infinite scroll: observe sentinel element
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // When sentinel becomes visible, load more
+        if (entries[0].isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      {
+        // Trigger when sentinel is 200px from viewport (load early for smooth UX)
+        rootMargin: "200px",
+        threshold: 0,
+      }
+    );
+
+    observer.observe(sentinel);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [handleLoadMore]);
 
   // Format festival slug for display (bfi-lff-2026 -> BFI LFF 2026)
   const formatFestivalName = (slug: string) => {
@@ -281,26 +304,15 @@ export function CalendarViewWithLoader({ initialScreenings, cinemas }: CalendarV
         <CalendarView screenings={allScreenings} cinemas={cinemas} />
       </ErrorBoundary>
 
-      {/* Load More Button */}
+      {/* Infinite scroll sentinel & loading indicator */}
       {canLoadMore && (
-        <div className="flex justify-center py-8">
-          <button
-            onClick={handleLoadMore}
-            disabled={isLoading}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-background-secondary border border-border-subtle text-text-secondary hover:text-text-primary hover:border-border-default shadow-card transition-all disabled:opacity-50"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Loading more screenings...
-              </>
-            ) : (
-              <>
-                <ChevronDown className="w-4 h-4" />
-                Load more (showing until {dateLabel})
-              </>
-            )}
-          </button>
+        <div ref={sentinelRef} className="py-8">
+          {isLoading && (
+            <div className="flex items-center justify-center gap-2 text-text-secondary">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Loading more screenings...</span>
+            </div>
+          )}
         </div>
       )}
 
