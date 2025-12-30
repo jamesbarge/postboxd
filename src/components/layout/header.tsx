@@ -28,7 +28,7 @@ import { MobileDatePickerModal } from "@/components/filters/mobile-date-picker-m
 import { MobileCinemaPickerModal } from "@/components/filters/mobile-cinema-picker-modal";
 import { DayPicker } from "react-day-picker";
 import { cn } from "@/lib/cn";
-import { useFilters, TIME_PRESETS, formatTimeRange, formatHour, isIndependentCinema } from "@/stores/filters";
+import { useFilters, TIME_PRESETS, FORMAT_OPTIONS, formatTimeRange, formatHour, isIndependentCinema } from "@/stores/filters";
 import { usePreferences } from "@/stores/preferences";
 import { Button, IconButton } from "@/components/ui";
 import { Clock } from "lucide-react";
@@ -122,6 +122,14 @@ export function Header({ cinemas, festivals }: HeaderProps) {
               <CinemaFilter cinemas={cinemas} mounted={mounted} fullWidth />
             </div>
 
+            {/* Format */}
+            <div className="py-4">
+              <label className="block text-[11px] font-semibold text-text-tertiary uppercase tracking-wider mb-3">
+                Projection Format
+              </label>
+              <FormatFilter mounted={mounted} fullWidth />
+            </div>
+
             {/* Clear All */}
             <div className="pt-4">
               {mounted && <ClearFiltersButton fullWidth />}
@@ -144,6 +152,9 @@ export function Header({ cinemas, festivals }: HeaderProps) {
 
           {/* Cinema Filter */}
           <CinemaFilter cinemas={cinemas} mounted={mounted} />
+
+          {/* Format Filter */}
+          <FormatFilter mounted={mounted} />
 
           {/* Clear All */}
           {mounted && <ClearFiltersButton />}
@@ -237,6 +248,17 @@ function ActiveFilterChips({ cinemas, mounted }: { cinemas: Cinema[]; mounted: b
           ? cinemas.find(c => c.id === filters.cinemaIds[0])?.shortName || "1 Cinema"
           : `${count} Cinemas`,
         onRemove: () => filters.setCinemas([]),
+      });
+    }
+
+    // Format chips (show each selected format)
+    if (filters.formats.length > 0) {
+      const formatLabels = filters.formats
+        .map(f => FORMAT_OPTIONS.find(opt => opt.value === f)?.label || f)
+        .join(", ");
+      chips.push({
+        label: filters.formats.length === 1 ? formatLabels : `${filters.formats.length} Formats`,
+        onRemove: () => filters.formats.forEach(f => filters.toggleFormat(f)),
       });
     }
   }
@@ -1139,6 +1161,111 @@ function CinemaFilter({ cinemas, mounted }: { cinemas: Cinema[]; mounted: boolea
         onClose={() => setIsMobileModalOpen(false)}
         cinemas={cinemas}
       />
+    </div>
+  );
+}
+
+// Format Filter Component - 35mm, 70mm, IMAX, etc.
+function FormatFilter({ mounted, fullWidth }: { mounted: boolean; fullWidth?: boolean }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { formats, toggleFormat } = useFilters();
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const displayText = useMemo(() => {
+    if (!mounted || formats.length === 0) return "Format";
+    if (formats.length === 1) {
+      const format = FORMAT_OPTIONS.find((f) => f.value === formats[0]);
+      return format?.label || formats[0];
+    }
+    return `${formats.length} Formats`;
+  }, [mounted, formats]);
+
+  const hasSelection = mounted && formats.length > 0;
+
+  return (
+    <div ref={containerRef} className={cn("relative", fullWidth && "w-full")}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all",
+          fullWidth ? "w-full" : "min-w-[120px]",
+          hasSelection
+            ? "bg-accent-primary/10 border-accent-primary/30 text-accent-primary"
+            : "bg-background-secondary border-border-default text-text-secondary hover:border-border-emphasis hover:text-text-primary"
+        )}
+      >
+        <Film className="w-4 h-4 shrink-0" />
+        <span className="flex-1 text-left truncate">{displayText}</span>
+        <ChevronDown className={cn("w-4 h-4 shrink-0 transition-transform", isOpen && "rotate-180")} />
+      </button>
+
+      {isOpen && (
+        <div className={cn(
+          "absolute top-full mt-2 z-50 bg-background-secondary border border-border-default rounded-xl shadow-elevated overflow-hidden",
+          fullWidth ? "left-0 right-0" : "left-0 w-56"
+        )}>
+          {/* Header */}
+          <div className="p-3 border-b border-border-subtle">
+            <p className="text-xs text-text-tertiary">
+              Filter by projection format. Select multiple to see screenings in any of these formats.
+            </p>
+          </div>
+
+          {/* Format Options */}
+          <div className="max-h-64 overflow-y-auto p-2">
+            {FORMAT_OPTIONS.map((format) => {
+              const isSelected = formats.includes(format.value);
+              return (
+                <button
+                  key={format.value}
+                  onClick={() => toggleFormat(format.value)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2",
+                    isSelected
+                      ? "bg-accent-primary/10 text-accent-primary"
+                      : "text-text-secondary hover:bg-background-hover hover:text-text-primary"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                      isSelected ? "bg-accent-primary border-accent-primary" : "border-border-default"
+                    )}
+                  >
+                    {isSelected && <Check className="w-3 h-3 text-text-inverse" />}
+                  </div>
+                  <span>{format.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Clear Selection */}
+          {formats.length > 0 && (
+            <div className="border-t border-border-subtle p-2">
+              <button
+                onClick={() => {
+                  formats.forEach((f) => toggleFormat(f));
+                  setIsOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm text-text-tertiary hover:bg-background-hover hover:text-text-primary transition-colors"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
