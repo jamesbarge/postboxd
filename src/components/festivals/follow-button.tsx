@@ -10,6 +10,7 @@ import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { useFestivalStore } from "@/stores/festival";
+import { useHydrated } from "@/hooks/useHydrated";
 import { Bell, Check } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -33,6 +34,7 @@ export function FollowButton({
   className,
 }: FollowButtonProps) {
   const { isSignedIn } = useAuth();
+  const mounted = useHydrated();
   const {
     followFestival,
     unfollowFestival,
@@ -40,8 +42,10 @@ export function FollowButton({
     getFollow,
   } = useFestivalStore();
 
-  // Use store state, falling back to server state
-  const isFollowing = checkIsFollowing(festivalId) || initialIsFollowing;
+  // Use store state after hydration, falling back to server state
+  // This prevents CLS when Zustand hydrates from localStorage
+  const storeIsFollowing = mounted ? checkIsFollowing(festivalId) : false;
+  const isFollowing = storeIsFollowing || initialIsFollowing;
   const [isLoading, setIsLoading] = useState(false);
 
   const handleClick = async (e: React.MouseEvent) => {

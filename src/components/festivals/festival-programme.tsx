@@ -2,8 +2,12 @@ import { db } from "@/db";
 import { festivals, festivalScreenings, screenings, films, cinemas } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { format } from "date-fns";
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin } from "lucide-react";
+
+// Blur placeholder for poster images to prevent CLS
+const POSTER_BLUR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAPCAYAAADd/14OAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAKklEQVQoz2Nk+M/AQAxgZGBg+M9AB2BkYGBgZGRgYGCgF2D4T7wexAAGABPmAhHXnXDuAAAAAElFTkSuQmCC";
 
 interface FestivalProgrammeProps {
   festivalId: string;
@@ -75,17 +79,23 @@ export async function FestivalProgramme({ festivalId }: FestivalProgrammeProps) 
                   className="group relative bg-background-card border border-border-subtle rounded-lg overflow-hidden hover:border-border-emphasis transition-all"
                 >
                   <div className="aspect-[2/3] relative bg-background-tertiary">
-                    {film.posterUrl ? (
-                      <img
+                    {film.posterUrl && !film.posterUrl.includes('poster-placeholder') ? (
+                      <Image
                         src={film.posterUrl}
                         alt={film.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                        placeholder="blur"
+                        blurDataURL={POSTER_BLUR}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-text-tertiary">
-                        No Poster
-                      </div>
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={`/api/poster-placeholder?title=${encodeURIComponent(film.title)}${film.year ? `&year=${film.year}` : ""}`}
+                        alt={film.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
                     )}
                     
                     {/* Premiere Badge */}
