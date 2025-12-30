@@ -16,11 +16,9 @@ type Festival = FestivalCardProps["festival"];
 
 interface FestivalListProps {
   festivals: Festival[];
-  showPast?: boolean;
 }
 
-export function FestivalList({ festivals, showPast = false }: FestivalListProps) {
-  const [showPastFestivals, setShowPastFestivals] = useState(showPast);
+export function FestivalList({ festivals }: FestivalListProps) {
 
   // Group festivals by status
   const grouped = useMemo(() => {
@@ -46,7 +44,6 @@ export function FestivalList({ festivals, showPast = false }: FestivalListProps)
   }, [festivals]);
 
   const hasAnyFestivals = grouped.ongoing.length > 0 || grouped.upcoming.length > 0;
-  const hasActiveFestivals = hasAnyFestivals || (showPastFestivals && grouped.past.length > 0);
 
   if (festivals.length === 0) {
     return (
@@ -94,41 +91,12 @@ export function FestivalList({ festivals, showPast = false }: FestivalListProps)
         </section>
       )}
 
-      {/* Past Festivals Toggle */}
-      {grouped.past.length > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-display text-text-primary">Past Festivals</h2>
-              <Badge variant="default" size="sm">
-                {grouped.past.length}
-              </Badge>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowPastFestivals(!showPastFestivals)}
-            >
-              {showPastFestivals ? "Hide" : "Show"}
-            </Button>
-          </div>
-
-          {showPastFestivals && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {grouped.past.map((festival) => (
-                <FestivalCard key={festival.id} festival={festival} />
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
       {/* No active festivals message */}
-      {!hasAnyFestivals && grouped.past.length > 0 && !showPastFestivals && (
+      {!hasAnyFestivals && (
         <EmptyState
           icon={<Calendar className="w-12 h-12" />}
           title="No upcoming festivals"
-          description="All festivals have ended. Show past festivals to browse previous events."
+          description="Check back later for upcoming film festivals in London"
         />
       )}
     </div>
