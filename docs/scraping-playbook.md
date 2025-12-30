@@ -27,6 +27,7 @@ This document describes how each cinema website is scraped, including the approa
 | **ArtHouse Crouch End** | HTML (Savoy) | No | `arthousecrouchend.savoysystems.co.uk/.dll/` | Working |
 | **Phoenix Cinema** | GraphQL (INDY) | Playwright | `phoenixcinema.co.uk/graphql` | Working |
 | **Rich Mix** | JSON API | No | `richmix.org.uk/whats-on/cinema/?ajax=1&json=1` | Working |
+| **Regent Street Cinema** | GraphQL (INDY) | Playwright | `regentstreetcinema.com/graphql` | Working |
 
 ---
 
@@ -736,6 +737,49 @@ This parses the datetime components directly, avoiding any timezone confusion re
 - Website occasionally shows "technical issue" notice for booking
 - Spektrix data still loads even when booking disabled
 - Some films are events/festivals without standard pricing
+
+---
+
+### 20. Regent Street Cinema
+
+**File:** `src/scrapers/cinemas/regent-street.ts`
+
+**Approach:**
+- Uses INDY Systems GraphQL API at `/graphql` (same platform as Phoenix)
+- Playwright browser needed to establish session
+- Intercepts `showingsForDate` responses
+- No direct API access - requires browser context
+
+**GraphQL Endpoint:** `https://www.regentstreetcinema.com/graphql`
+
+**Key Queries:**
+- `movies` - current films with metadata
+- `currentAndUpcomingMovies` - all upcoming films (80+)
+- `showingsForDate` - screenings per date
+
+**Showing Structure:**
+```json
+{
+  "id": "317075",
+  "time": "2026-01-25T15:30:00Z",
+  "published": true,
+  "past": false,
+  "screenId": "117",
+  "movie": {
+    "id": "25723",
+    "name": "National Theatre Live: Hamlet",
+    "urlSlug": "nt-live-hamlet"
+  }
+}
+```
+
+**Date Format:**
+- ISO UTC datetime strings: `"2026-01-25T15:30:00Z"`
+
+**Known Issues:**
+- Page uses Quasar (Vue) framework - fully dynamic rendering
+- Multiple GraphQL calls happen on page load
+- Need to wait for all showingsForDate responses (3-5 batches typical)
 
 ---
 
