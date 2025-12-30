@@ -8,6 +8,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Eye, EyeOff, Heart, X, Check } from "lucide-react";
 import { useFilmStatus, FilmStatus } from "@/stores/film-status";
+import { useHydrated } from "@/hooks/useHydrated";
 import { cn } from "@/lib/cn";
 
 interface StatusToggleProps {
@@ -42,8 +43,11 @@ const statusConfig: Record<
 export function StatusToggle({ filmId, variant = "full" }: StatusToggleProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const hydrated = useHydrated();
   const { films, setStatus } = useFilmStatus();
-  const currentStatus = films[filmId]?.status ?? null;
+
+  // Only access store after hydration to prevent CLS
+  const currentStatus = hydrated ? (films[filmId]?.status ?? null) : null;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -99,7 +103,7 @@ export function StatusToggle({ filmId, variant = "full" }: StatusToggleProps) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex items-center gap-2 px-4 py-2 rounded-lg border transition-all",
+          "flex items-center gap-2 px-4 py-2 rounded-lg border transition-all min-w-[160px]",
           currentStatus && activeConfig
             ? activeConfig.activeClassName
             : "border-border-default text-text-secondary hover:border-border-emphasis hover:text-text-primary"
