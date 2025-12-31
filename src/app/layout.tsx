@@ -5,6 +5,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "@/components/providers";
 import { OrganizationSchema } from "@/components/seo/json-ld";
+import { Footer } from "@/components/layout/footer";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -155,7 +156,12 @@ export default function RootLayout({
             },
           }}
         >
-          <Providers>{children}</Providers>
+          <Providers>
+            <div className="min-h-screen flex flex-col">
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
+          </Providers>
         </ClerkProvider>
         <Analytics />
         <SpeedInsights />

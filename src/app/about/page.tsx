@@ -233,7 +233,7 @@ export default async function AboutPage() {
         </section>
 
         {/* Data sources */}
-        <section>
+        <section className="mb-12">
           <h2 className="text-xl font-display text-text-primary mb-4">
             Data Sources
           </h2>
@@ -250,6 +250,23 @@ export default async function AboutPage() {
             . Screening times are sourced directly from each cinema&apos;s
             website. While we strive for accuracy, always verify showtimes on the
             cinema&apos;s official site before booking.
+          </p>
+        </section>
+
+        {/* Contact */}
+        <section>
+          <h2 className="text-xl font-display text-text-primary mb-4">
+            Contact
+          </h2>
+          <p className="text-text-secondary text-sm">
+            Questions, feedback, or suggestions? Get in touch at{" "}
+            <a
+              href="mailto:jdwbarge@gmail.com"
+              className="text-accent-primary hover:underline"
+            >
+              jdwbarge@gmail.com
+            </a>
+            .
           </p>
         </section>
       </div>
