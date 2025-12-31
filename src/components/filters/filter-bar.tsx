@@ -49,6 +49,7 @@ function FilterBarContent({ festivals }: { festivals: { id: string; name: string
 
   // Compute activeCount by directly accessing state properties
   // This creates proper Zustand subscriptions so the component re-renders when filters clear
+  // Note: Don't count hideNotInterested - it's the default behavior (see filters store comment)
   const activeCount = mounted
     ? (filters.filmSearch.trim() ? 1 : 0) +
       filters.cinemaIds.length +
@@ -60,8 +61,8 @@ function FilterBarContent({ festivals }: { festivals: { id: string; name: string
       filters.genres.length +
       filters.timesOfDay.length +
       (filters.hideSeen ? 1 : 0) +
-      (filters.hideNotInterested ? 1 : 0) +
-      (filters.onlySingleShowings ? 1 : 0)
+      (filters.onlySingleShowings ? 1 : 0) +
+      (filters.festivalSlug ? 1 : 0)
     : 0;
 
   return (
