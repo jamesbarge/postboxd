@@ -6,24 +6,19 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Cookie, X } from "lucide-react";
+import { Cookie } from "lucide-react";
+import { useHydrated } from "@/hooks/useHydrated";
 import { useCookieConsent } from "@/stores/cookie-consent";
 
 export function CookieConsentBanner() {
-  const [mounted, setMounted] = useState(false);
+  const hydrated = useHydrated();
   const analyticsConsent = useCookieConsent((state) => state.analyticsConsent);
   const acceptAnalytics = useCookieConsent((state) => state.acceptAnalytics);
   const rejectAnalytics = useCookieConsent((state) => state.rejectAnalytics);
 
-  // Prevent hydration mismatch - only show after mount
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   // Don't render on server or if user has already made a choice
-  if (!mounted || analyticsConsent !== "pending") {
+  if (!hydrated || analyticsConsent !== "pending") {
     return null;
   }
 
