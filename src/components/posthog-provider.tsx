@@ -2,11 +2,15 @@
 
 import posthog from "posthog-js";
 import { PostHogProvider as PHProvider, usePostHog } from "posthog-js/react";
-import { useEffect, Suspense } from "react";
+import { useEffect, Suspense, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
+import { useCookieConsent } from "@/stores/cookie-consent";
 
-// Initialize PostHog only on the client side
+/**
+ * Initialize PostHog with privacy-first defaults.
+ * Tracking is disabled by default and only enabled after explicit consent.
+ */
 if (typeof window !== "undefined") {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
     // Use reverse proxy to avoid ad blockers
@@ -18,27 +22,34 @@ if (typeof window !== "undefined") {
     // Capture pageleaves for session replay accuracy
     capture_pageleave: true,
 
-    // Session Replay - record user sessions
-    disable_session_recording: false,
+    // PRIVACY: Don't persist data until consent is given
+    // This prevents cookies from being set before consent
+    persistence: "memory",
+
+    // PRIVACY: Opt out of tracking by default (PECR/UK GDPR compliance)
+    opt_out_capturing_by_default: true,
+
+    // Session Replay - record user sessions (only after consent)
+    disable_session_recording: true, // Will be enabled after consent
     session_recording: {
       // Mask all text inputs for privacy
       maskAllInputs: true,
       // Mask sensitive text content
-      maskTextSelector: '[data-ph-mask]',
+      maskTextSelector: "[data-ph-mask]",
     },
 
-    // Autocapture settings
+    // Autocapture settings (only active after consent)
     autocapture: {
       // Capture clicks, form submissions, etc.
-      dom_event_allowlist: ['click', 'submit', 'change'],
+      dom_event_allowlist: ["click", "submit", "change"],
       // Capture useful element attributes
-      element_allowlist: ['button', 'a', 'input', 'select', 'textarea'],
+      element_allowlist: ["button", "a", "input", "select", "textarea"],
     },
 
-    // Performance - capture web vitals
+    // Performance - capture web vitals (only after consent)
     capture_performance: true,
 
-    // Error tracking - capture exceptions
+    // Error tracking - capture exceptions (only after consent)
     capture_exceptions: true,
 
     // Enable debug mode in development
@@ -50,36 +61,77 @@ if (typeof window !== "undefined") {
   });
 }
 
-// Component to track pageviews with App Router
-function PostHogPageView() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const posthog = usePostHog();
+/**
+ * Component to manage consent state and update PostHog accordingly
+ */
+function PostHogConsentManager() {
+  const posthogClient = usePostHog();
+  const analyticsConsent = useCookieConsent((state) => state.analyticsConsent);
+  const hasAppliedConsent = useRef(false);
 
   useEffect(() => {
-    if (pathname && posthog) {
-      let url = window.origin + pathname;
-      if (searchParams.toString()) {
-        url = url + "?" + searchParams.toString();
-      }
-      posthog.capture("$pageview", { $current_url: url });
+    if (!posthogClient) return;
+
+    // Only apply consent changes once per state change
+    if (analyticsConsent === "accepted" && !hasAppliedConsent.current) {
+      // User accepted - enable tracking with persistent storage
+      posthogClient.opt_in_capturing();
+      posthogClient.set_config({
+        persistence: "localStorage+cookie",
+        disable_session_recording: false,
+      });
+      hasAppliedConsent.current = true;
+    } else if (analyticsConsent === "rejected") {
+      // User rejected - ensure tracking is disabled
+      posthogClient.opt_out_capturing();
+      hasAppliedConsent.current = true;
+    } else if (analyticsConsent === "pending") {
+      // Reset for fresh consent
+      hasAppliedConsent.current = false;
     }
-  }, [pathname, searchParams, posthog]);
+  }, [posthogClient, analyticsConsent]);
 
   return null;
 }
 
-// Component to identify users with Clerk
-function PostHogUserIdentify() {
-  const { user, isLoaded } = useUser();
-  const posthog = usePostHog();
+/**
+ * Component to track pageviews with App Router
+ * Only tracks if consent has been given
+ */
+function PostHogPageView() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const posthogClient = usePostHog();
+  const canTrack = useCookieConsent((state) => state.canTrack());
 
   useEffect(() => {
-    if (!isLoaded || !posthog) return;
+    if (pathname && posthogClient && canTrack) {
+      let url = window.origin + pathname;
+      if (searchParams.toString()) {
+        url = url + "?" + searchParams.toString();
+      }
+      posthogClient.capture("$pageview", { $current_url: url });
+    }
+  }, [pathname, searchParams, posthogClient, canTrack]);
+
+  return null;
+}
+
+/**
+ * Component to identify users with Clerk
+ * Only identifies if consent has been given
+ */
+function PostHogUserIdentify() {
+  const { user, isLoaded } = useUser();
+  const posthogClient = usePostHog();
+  const canTrack = useCookieConsent((state) => state.canTrack());
+
+  useEffect(() => {
+    if (!isLoaded || !posthogClient || !canTrack) return;
 
     if (user) {
       // Identify the user in PostHog
-      posthog.identify(user.id, {
+      posthogClient.identify(user.id, {
         email: user.primaryEmailAddress?.emailAddress,
         name: user.fullName,
         firstName: user.firstName,
@@ -90,9 +142,9 @@ function PostHogUserIdentify() {
       });
     } else {
       // User signed out - reset PostHog identity
-      posthog.reset();
+      posthogClient.reset();
     }
-  }, [user, isLoaded, posthog]);
+  }, [user, isLoaded, posthogClient, canTrack]);
 
   return null;
 }
@@ -100,6 +152,7 @@ function PostHogUserIdentify() {
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   return (
     <PHProvider client={posthog}>
+      <PostHogConsentManager />
       <Suspense fallback={null}>
         <PostHogPageView />
       </Suspense>

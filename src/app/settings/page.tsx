@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { NotInterestedList } from "@/components/settings/not-interested-list";
 import { CalendarViewSetting } from "@/components/settings/calendar-view-setting";
+import { CookieConsentSettings } from "@/components/cookie-consent-banner";
 
 export default function SettingsPage() {
   return (
@@ -54,6 +55,18 @@ export default function SettingsPage() {
           </p>
 
           <NotInterestedList />
+        </section>
+
+        {/* Privacy Section */}
+        <section className="mb-12">
+          <h2 className="text-xl font-display text-text-primary mb-4">
+            Privacy & Cookies
+          </h2>
+          <p className="text-text-secondary text-sm mb-6">
+            Control how we use cookies to improve your experience.
+          </p>
+
+          <CookieConsentSettings />
         </section>
       </div>
     </div>
