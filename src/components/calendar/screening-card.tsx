@@ -22,6 +22,7 @@ import { useFilmStatus, type FilmStatus } from "@/stores/film-status";
 import { memo } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { usePostHog } from "posthog-js/react";
+import { usePrefetch } from "@/hooks/usePrefetch";
 
 interface ScreeningCardProps {
   screening: {
@@ -63,6 +64,9 @@ export const ScreeningCard = memo(function ScreeningCard({ screening }: Screenin
   const setStatus = useFilmStatus((state) => state.setStatus);
 
   const mounted = useHydrated();
+
+  // Prefetch film page on hover for instant navigation
+  const prefetch = usePrefetch(`/film/${film.id}`);
 
   // Track screening card clicks
   const trackCardClick = () => {
@@ -127,6 +131,9 @@ export const ScreeningCard = memo(function ScreeningCard({ screening }: Screenin
         "focus-within:ring-2 focus-within:ring-accent-primary/40 focus-within:ring-offset-2 focus-within:ring-offset-background-primary"
       )}
       aria-label={`${film.title} screening at ${cinema.name}, ${formattedDate} at ${time}`}
+      onMouseEnter={prefetch.onMouseEnter}
+      onMouseLeave={prefetch.onMouseLeave}
+      onTouchStart={prefetch.onTouchStart}
     >
       {/* Poster area - contains link and buttons */}
       <div className="relative aspect-[2/3] w-full overflow-hidden">

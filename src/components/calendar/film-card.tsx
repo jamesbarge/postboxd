@@ -21,6 +21,7 @@ import { useFilmStatus, type FilmStatus } from "@/stores/film-status";
 import { memo } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { usePostHog } from "posthog-js/react";
+import { usePrefetch } from "@/hooks/usePrefetch";
 
 interface FilmCardProps {
   film: {
@@ -57,6 +58,9 @@ export const FilmCard = memo(function FilmCard({
   const setStatus = useFilmStatus((state) => state.setStatus);
 
   const mounted = useHydrated();
+
+  // Prefetch film page on hover for instant navigation
+  const prefetch = usePrefetch(`/film/${film.id}`);
 
   // Track film card clicks
   const trackCardClick = () => {
@@ -123,6 +127,9 @@ export const FilmCard = memo(function FilmCard({
         "focus-within:ring-2 focus-within:ring-accent-primary/40 focus-within:ring-offset-2 focus-within:ring-offset-background-primary"
       )}
       aria-label={`${film.title} - ${screeningCount} ${screeningLabel} at ${cinemaDisplay}`}
+      onMouseEnter={prefetch.onMouseEnter}
+      onMouseLeave={prefetch.onMouseLeave}
+      onTouchStart={prefetch.onTouchStart}
     >
       {/* Poster area - contains link and buttons */}
       <div className="relative aspect-[2/3] w-full overflow-hidden">

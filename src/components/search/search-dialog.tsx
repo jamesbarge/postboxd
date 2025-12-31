@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { usePrefetch } from "@/hooks/usePrefetch";
 import Image from "next/image";
 import { Search, X, Film, Calendar, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -174,60 +175,13 @@ export function SearchDialog() {
             {results.length > 0 ? (
               <div className="py-2">
                 {results.map((film, index) => (
-                  <button
+                  <SearchResultItem
                     key={film.id}
-                    onClick={() => navigateToFilm(film, index)}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
-                      selectedIndex === index
-                        ? "bg-accent-primary/10"
-                        : "hover:bg-surface-overlay-hover"
-                    )}
-                  >
-                    {/* Poster */}
-                    <div className="w-10 h-14 rounded overflow-hidden bg-background-tertiary shrink-0">
-                      {film.posterUrl ? (
-                        <Image
-                          src={film.posterUrl}
-                          alt=""
-                          width={40}
-                          height={56}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Film className="w-5 h-5 text-text-tertiary" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        <span className="font-display text-text-primary truncate">
-                          {film.title}
-                        </span>
-                        {film.year && (
-                          <span className="text-sm text-text-tertiary shrink-0">
-                            ({film.year})
-                          </span>
-                        )}
-                      </div>
-                      {film.directors.length > 0 && (
-                        <p className="text-sm text-text-secondary truncate">
-                          {film.directors.join(", ")}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Screening Count */}
-                    {film.screeningCount > 0 && (
-                      <div className="flex items-center gap-1 text-xs text-accent-highlight-dark shrink-0">
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>{film.screeningCount}</span>
-                      </div>
-                    )}
-                  </button>
+                    film={film}
+                    index={index}
+                    isSelected={selectedIndex === index}
+                    onSelect={navigateToFilm}
+                  />
                 ))}
               </div>
             ) : query.trim() && !isLoading ? (
@@ -269,6 +223,81 @@ export function SearchDialog() {
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Search Result Item with hover prefetching
+ * Prefetches the film page when user hovers for instant navigation
+ */
+function SearchResultItem({
+  film,
+  index,
+  isSelected,
+  onSelect,
+}: {
+  film: SearchResult;
+  index: number;
+  isSelected: boolean;
+  onSelect: (film: SearchResult, index: number) => void;
+}) {
+  const prefetch = usePrefetch(`/film/${film.id}`);
+
+  return (
+    <button
+      onClick={() => onSelect(film, index)}
+      onMouseEnter={prefetch.onMouseEnter}
+      onMouseLeave={prefetch.onMouseLeave}
+      onTouchStart={prefetch.onTouchStart}
+      className={cn(
+        "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
+        isSelected ? "bg-accent-primary/10" : "hover:bg-surface-overlay-hover"
+      )}
+    >
+      {/* Poster */}
+      <div className="w-10 h-14 rounded overflow-hidden bg-background-tertiary shrink-0">
+        {film.posterUrl ? (
+          <Image
+            src={film.posterUrl}
+            alt=""
+            width={40}
+            height={56}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Film className="w-5 h-5 text-text-tertiary" />
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2">
+          <span className="font-display text-text-primary truncate">
+            {film.title}
+          </span>
+          {film.year && (
+            <span className="text-sm text-text-tertiary shrink-0">
+              ({film.year})
+            </span>
+          )}
+        </div>
+        {film.directors.length > 0 && (
+          <p className="text-sm text-text-secondary truncate">
+            {film.directors.join(", ")}
+          </p>
+        )}
+      </div>
+
+      {/* Screening Count */}
+      {film.screeningCount > 0 && (
+        <div className="flex items-center gap-1 text-xs text-accent-highlight-dark shrink-0">
+          <Calendar className="w-3.5 h-3.5" />
+          <span>{film.screeningCount}</span>
+        </div>
+      )}
+    </button>
   );
 }
 
