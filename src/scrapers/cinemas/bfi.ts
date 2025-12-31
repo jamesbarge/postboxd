@@ -99,161 +99,59 @@ export class BFIScraper {
     if (!this.page) throw new Error("Browser not initialized");
 
     const screenings: RawScreening[] = [];
+    const dates = this.generateDateRange(45); // Fetch next 45 days
 
-    try {
-      // Navigate to the calendar page first
-      console.log(`[${this.config.cinemaId}] Opening calendar...`);
+    console.log(`[${this.config.cinemaId}] Fetching ${dates.length} days of screenings via direct URL...`);
 
-      // The calendar is at the main whatson page
-      await this.page.goto(`${this.venue.baseUrl}/default.asp`, {
-        waitUntil: "domcontentloaded",
-        timeout: 60000,
-      });
+    for (let i = 0; i < dates.length; i++) {
+      const date = dates[i];
+      const dateStr = this.formatDate(date);
+      const url = this.buildSearchUrl(dateStr);
 
-      const cloudflareCleared = await waitForCloudflare(this.page!,45);
-      if (!cloudflareCleared) {
-        console.log(`[${this.config.cinemaId}] Cloudflare did not clear, trying anyway...`);
-      }
+      try {
+        console.log(`[${this.config.cinemaId}] Fetching ${dateStr} (${i + 1}/${dates.length})...`);
 
-      await this.page.waitForTimeout(3000);
+        await this.page.goto(url, {
+          waitUntil: "domcontentloaded",
+          timeout: 30000,
+        });
 
-      // Debug: Log the page title and URL
-      const title = await this.page.title();
-      const url = this.page.url();
-      console.log(`[${this.config.cinemaId}] Page title: "${title}", URL: ${url}`);
+        // Wait for potential Cloudflare challenge
+        await waitForCloudflare(this.page, 15);
+        await this.page.waitForTimeout(1500);
 
-      // Try waiting for calendar to appear - various selectors
-      const calendarSelectors = [
-        '[role="grid"]',
-        '[role="gridcell"]',
-        '.calendar',
-        '[class*="calendar"]',
-        '[class*="datepicker"]',
-        'table',
-      ];
-
-      let calendarFound = false;
-      for (const selector of calendarSelectors) {
-        const exists = await this.page.$(selector);
-        if (exists) {
-          console.log(`[${this.config.cinemaId}] Found element matching: ${selector}`);
-          calendarFound = true;
-          break;
-        }
-      }
-
-      if (!calendarFound) {
-        // Debug: Log snippet of HTML to understand page structure
         const html = await this.page.content();
-        console.log(`[${this.config.cinemaId}] No calendar found. Page HTML length: ${html.length}`);
-        console.log(`[${this.config.cinemaId}] HTML preview: ${html.substring(0, 500)}...`);
 
-        // Try alternative: look for film listings directly on the page
-        return this.parseSearchResults(html);
-      }
-
-      // Debug: Inspect grid structure
-      const gridHtml = await this.page.$eval('[role="grid"]', el => el.outerHTML.substring(0, 2000)).catch(() => "grid not found");
-      console.log(`[${this.config.cinemaId}] Grid HTML preview: ${gridHtml.substring(0, 500)}...`);
-
-      // Try multiple selector patterns for calendar cells
-      const cellSelectors = [
-        '[role="gridcell"][aria-disabled="false"]',
-        '[role="gridcell"]:not([aria-disabled="true"])',
-        '[role="gridcell"]',
-        '[role="grid"] button',
-        '[role="grid"] a',
-        '.calendar-day',
-        '[class*="day"]',
-      ];
-
-      let dateCells: Awaited<ReturnType<typeof this.page.$$>>  = [];
-      let usedSelector = "";
-      for (const selector of cellSelectors) {
-        const cells = await this.page.$$(selector);
-        console.log(`[${this.config.cinemaId}] Selector "${selector}" found ${cells.length} elements`);
-        if (cells.length > 0 && dateCells.length === 0) {
-          dateCells = cells;
-          usedSelector = selector;
+        // Check if we got blocked
+        if (html.includes("challenge-platform") || html.includes("Checking your browser")) {
+          console.log(`[${this.config.cinemaId}] Cloudflare challenge on ${dateStr}, waiting...`);
+          await this.page.waitForTimeout(5000);
+          continue;
         }
-      }
-      console.log(`[${this.config.cinemaId}] Using selector: ${usedSelector}, found ${dateCells.length} active calendar dates`);
 
-      // Use the working selector in the loop
-      const workingSelector = usedSelector || '[role="gridcell"]:not([aria-disabled="true"])';
-      console.log(`[${this.config.cinemaId}] Starting date loop with ${dateCells.length} dates...`);
-
-      for (let i = 0; i < Math.min(dateCells.length, 30); i++) {
-        try {
-          // Re-query date cells after each navigation since DOM changes
-          const currentCells = await this.page.$$(workingSelector);
-          console.log(`[${this.config.cinemaId}] Re-queried: ${currentCells.length} cells for iteration ${i}`);
-          if (i >= currentCells.length) break;
-
-          const cell = currentCells[i];
-          const dateLabel = await cell.getAttribute("aria-label") || await cell.textContent() || "";
-
-          console.log(`[${this.config.cinemaId}] Clicking date: ${dateLabel.trim() || `cell ${i}`}...`);
-
-          // Click the date cell
-          await cell.click();
-          await this.page.waitForTimeout(2000);
-
-          // Wait for content to load
-          await waitForCloudflare(this.page!,10);
-
-          try {
-            await this.page.waitForSelector("main", { timeout: 5000 });
-          } catch {
-            // Continue even if main not found
-          }
-
-          await this.page.waitForTimeout(1000);
-
-          const html = await this.page.content();
-
-          // Debug: Show what we got after clicking
-          const pageUrl = this.page.url();
-          console.log(`[${this.config.cinemaId}] After click - URL: ${pageUrl}, HTML length: ${html.length}`);
-
-          // Debug: Check for screening-like content
+        // Debug: check what's in the HTML
+        if (i < 3) {
           const hasMain = html.includes('<main');
-          const hasLoadArticle = html.includes('loadArticle');
-          const hasGeneric = html.includes('generic');
-          console.log(`[${this.config.cinemaId}] Page content: main=${hasMain}, loadArticle=${hasLoadArticle}, generic=${hasGeneric}`);
-
-          const dayScreenings = this.parseSearchResults(html);
-          console.log(`[${this.config.cinemaId}] Parsed ${dayScreenings.length} screenings from this date`);
-
-          if (dayScreenings.length > 0) {
-            console.log(`[${this.config.cinemaId}] ${dateLabel.trim()}: ${dayScreenings.length} screenings`);
-            screenings.push(...dayScreenings);
-          }
-
-          // Navigate back to calendar for next date
-          await this.page.goto(`${this.venue.baseUrl}/default.asp`, {
-            waitUntil: "domcontentloaded",
-            timeout: 30000,
-          });
-          await waitForCloudflare(this.page!,10);
-          await this.page.waitForTimeout(1500);
-
-        } catch (error) {
-          console.error(`[${this.config.cinemaId}] Error on date ${i}:`, error);
-          // Try to recover by going back to calendar
-          try {
-            await this.page.goto(`${this.venue.baseUrl}/default.asp`, {
-              waitUntil: "domcontentloaded",
-              timeout: 30000,
-            });
-            await this.page.waitForTimeout(2000);
-          } catch {
-            // Ignore recovery errors
-          }
+          const hasResults = html.includes('Search results');
+          const hasChallenge = html.includes('challenge-platform');
+          console.log(`[${this.config.cinemaId}] Page debug: main=${hasMain}, results=${hasResults}, challenge=${hasChallenge}, length=${html.length}`);
         }
+
+        const dayScreenings = this.parseSearchResults(html);
+
+        if (dayScreenings.length > 0) {
+          console.log(`[${this.config.cinemaId}] ${dateStr}: ${dayScreenings.length} screenings`);
+          screenings.push(...dayScreenings);
+        }
+
+        // Small delay between requests to avoid rate limiting
+        await this.page.waitForTimeout(this.config.delayBetweenRequests || 2000);
+
+      } catch (error) {
+        console.error(`[${this.config.cinemaId}] Error fetching ${dateStr}:`, error);
+        // Continue with next date
+        await this.page.waitForTimeout(3000);
       }
-    } catch (error) {
-      console.error(`[${this.config.cinemaId}] Calendar navigation failed:`, error);
     }
 
     return screenings;
@@ -273,7 +171,11 @@ export class BFIScraper {
   }
 
   private formatDate(date: Date): string {
-    return date.toISOString().split("T")[0]; // YYYY-MM-DD
+    // BFI uses YYYY-M-D format (no leading zeros)
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    return `${year}-${month}-${day}`;
   }
 
   private buildSearchUrl(date: string): string {
