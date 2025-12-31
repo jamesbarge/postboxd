@@ -49,9 +49,10 @@ interface Festival {
 interface HeaderProps {
   cinemas: Cinema[];
   festivals: Festival[];
+  availableFormats: string[];
 }
 
-export function Header({ cinemas, festivals }: HeaderProps) {
+export function Header({ cinemas, festivals, availableFormats }: HeaderProps) {
   const mounted = useHydrated();
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -122,13 +123,15 @@ export function Header({ cinemas, festivals }: HeaderProps) {
               <CinemaFilter cinemas={cinemas} mounted={mounted} fullWidth />
             </div>
 
-            {/* Format */}
-            <div className="py-4">
-              <label className="block text-[11px] font-semibold text-text-tertiary uppercase tracking-wider mb-3">
-                Projection Format
-              </label>
-              <FormatFilter mounted={mounted} fullWidth />
-            </div>
+            {/* Format - only show if formats are available */}
+            {availableFormats.length > 0 && (
+              <div className="py-4">
+                <label className="block text-[11px] font-semibold text-text-tertiary uppercase tracking-wider mb-3">
+                  Projection Format
+                </label>
+                <FormatFilter mounted={mounted} availableFormats={availableFormats} fullWidth />
+              </div>
+            )}
 
             {/* Clear All */}
             <div className="pt-4">
@@ -154,7 +157,7 @@ export function Header({ cinemas, festivals }: HeaderProps) {
           <CinemaFilter cinemas={cinemas} mounted={mounted} />
 
           {/* Format Filter */}
-          <FormatFilter mounted={mounted} />
+          <FormatFilter mounted={mounted} availableFormats={availableFormats} />
 
           {/* Clear All */}
           {mounted && <ClearFiltersButton />}
@@ -1166,10 +1169,15 @@ function CinemaFilter({ cinemas, mounted }: { cinemas: Cinema[]; mounted: boolea
 }
 
 // Format Filter Component - 35mm, 70mm, IMAX, etc.
-function FormatFilter({ mounted, fullWidth }: { mounted: boolean; fullWidth?: boolean }) {
+function FormatFilter({ mounted, availableFormats, fullWidth }: { mounted: boolean; availableFormats: string[]; fullWidth?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { formats, toggleFormat } = useFilters();
+
+  // Only show formats that have screenings
+  const displayedFormats = useMemo(() => {
+    return FORMAT_OPTIONS.filter((opt) => availableFormats.includes(opt.value));
+  }, [availableFormats]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -1191,6 +1199,11 @@ function FormatFilter({ mounted, fullWidth }: { mounted: boolean; fullWidth?: bo
   }, [mounted, formats]);
 
   const hasSelection = mounted && formats.length > 0;
+
+  // Don't render if no formats are available
+  if (displayedFormats.length === 0) {
+    return null;
+  }
 
   return (
     <div ref={containerRef} className={cn("relative", fullWidth && "w-full")}>
@@ -1223,7 +1236,7 @@ function FormatFilter({ mounted, fullWidth }: { mounted: boolean; fullWidth?: bo
 
           {/* Format Options */}
           <div className="max-h-64 overflow-y-auto p-2">
-            {FORMAT_OPTIONS.map((format) => {
+            {displayedFormats.map((format) => {
               const isSelected = formats.includes(format.value);
               return (
                 <button

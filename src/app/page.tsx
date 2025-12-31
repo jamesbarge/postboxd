@@ -124,6 +124,13 @@ export default async function Home() {
     chain: c.chain,
   }));
 
+  // Extract unique formats from screenings (for format filter)
+  const availableFormats = [...new Set(
+    initialScreenings
+      .map(s => s.format)
+      .filter((f): f is NonNullable<typeof f> => f !== null)
+  )];
+
   // Generate FAQ items for GEO (AI citations)
   const faqItems = [
     {
@@ -150,6 +157,7 @@ export default async function Home() {
       <Header
         cinemas={allCinemas.map(c => ({ id: c.id, name: c.name, shortName: c.shortName, chain: c.chain }))}
         festivals={activeFestivals}
+        availableFormats={availableFormats}
       />
 
       {/* Feature Discovery Banner - dismissible once features are visited */}
