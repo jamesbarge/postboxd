@@ -33,14 +33,27 @@ London cinema calendar app that scrapes screening data from independent cinemas 
 
 ## Database Rules
 
+### CRITICAL: Never Delete Valid Screenings
+**DO NOT DELETE SCREENINGS** unless you have confirmed evidence they are incorrect:
+- Scrapers should ONLY ADD new screenings, never delete existing ones
+- The only valid reasons to delete screenings:
+  1. Time parsing bugs created screenings with obviously wrong times (e.g., 02:00 instead of 14:00)
+  2. Duplicate screenings with identical film, cinema, and datetime
+  3. Screenings for films that don't exist (orphaned foreign keys)
+- **Before deleting anything**, always check if the data is actually wrong
+- If a scraper returns fewer results than expected, that's NOT a reason to delete - investigate first
+- Past screenings naturally expire and are filtered out by queries - no deletion needed
+
 ### Screening Filtering
 - Filter out past screenings using current time (`new Date()`), not start of day
 - Use `gte(screenings.datetime, now)` to exclude screenings that have already started
 - A 2pm screening should not appear after 2pm on that day
 
 ### Cleanup Scripts
-- When fixing time parsing bugs, delete affected screenings with suspicious times
-- Suspicious = times between 00:00-09:59 for cinema screenings
+- `db:cleanup-screenings` removes PAST screenings only (already happened)
+- `db:cleanup-films` removes orphaned films with no screenings
+- **Never run bulk deletes** on future screenings without explicit user confirmation
+- When fixing time parsing bugs, only delete screenings with clearly suspicious times (00:00-09:59)
 
 ## UI Rules
 

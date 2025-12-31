@@ -103,6 +103,11 @@ function addToFilmCache(film: FilmRecord) {
 
 /**
  * Process raw screenings through the full pipeline
+ *
+ * IMPORTANT: This function ONLY ADDS or UPDATES screenings.
+ * It NEVER DELETES existing screenings. If a scraper returns fewer
+ * results than before, existing screenings are preserved.
+ * See CLAUDE.md for the "Never Delete Valid Screenings" rule.
  */
 export async function processScreenings(
   cinemaId: string,
