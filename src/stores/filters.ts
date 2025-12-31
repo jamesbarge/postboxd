@@ -401,7 +401,6 @@ export const FORMAT_OPTIONS = [
   { value: "70mm_imax", label: "70mm IMAX" },
   { value: "imax", label: "IMAX" },
   { value: "imax_laser", label: "IMAX Laser" },
-  { value: "dcp_4k", label: "4K" },
   { value: "dolby_cinema", label: "Dolby Cinema" },
 ] as const;
 
