@@ -129,13 +129,26 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
     return hidden;
   }, [allFilmStatuses, hideSeen, hideNotInterested]);
 
+  // Pre-parse datetimes once to avoid repeated Date construction in filter pipeline
+  // This is a significant performance optimization - parsing happens once instead of 5-8 times per screening
+  const parsedScreenings = useMemo(() => {
+    return screenings.map((s) => {
+      const dt = new Date(s.datetime);
+      return {
+        ...s,
+        _parsedDatetime: dt,
+        _hour: getHours(dt),
+        _dateKey: format(startOfDay(dt), "yyyy-MM-dd"),
+      };
+    });
+  }, [screenings]);
+
   // Precompute films that appear only once per day across London
   const singleShowingSet = useMemo(() => {
     if (!onlySingleShowings) return null;
     const counts = new Map<string, number>();
-    for (const screening of screenings) {
-      const dateKey = format(startOfDay(new Date(screening.datetime)), "yyyy-MM-dd");
-      const key = `${dateKey}|${screening.film.id}`;
+    for (const screening of parsedScreenings) {
+      const key = `${screening._dateKey}|${screening.film.id}`;
       counts.set(key, (counts.get(key) || 0) + 1);
     }
     const singles = new Set<string>();
@@ -143,9 +156,9 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
       if (count === 1) singles.add(key);
     }
     return singles;
-  }, [onlySingleShowings, screenings]);
+  }, [onlySingleShowings, parsedScreenings]);
 
-  // Apply all filters (only after mount)
+  // Apply all filters using pre-parsed datetime values (only after mount)
   const filteredScreenings = useMemo(() => {
     // Before mount, show nothing to avoid flashes; wait for hydration when hide filters rely on user data
     if (!mounted) return [];
@@ -154,9 +167,10 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
 
     const now = new Date();
 
-    return screenings.filter((s) => {
+    return parsedScreenings.filter((s) => {
       // Filter out past screenings (critical for ISR - server data may be up to 60s stale)
-      if (new Date(s.datetime) < now) {
+      // Uses pre-parsed datetime to avoid repeated Date construction
+      if (s._parsedDatetime < now) {
         return false;
       }
       // Film search filter (dynamic text search)
@@ -174,30 +188,28 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
         return false;
       }
 
-      // Date range filter
+      // Date range filter - uses pre-parsed datetime
       if (filters.dateFrom || filters.dateTo) {
-        const screeningDate = new Date(s.datetime);
         if (filters.dateFrom && filters.dateTo) {
-          if (!isWithinInterval(screeningDate, {
+          if (!isWithinInterval(s._parsedDatetime, {
             start: startOfDay(filters.dateFrom),
             end: endOfDay(filters.dateTo),
           })) {
             return false;
           }
-        } else if (filters.dateFrom && screeningDate < startOfDay(filters.dateFrom)) {
+        } else if (filters.dateFrom && s._parsedDatetime < startOfDay(filters.dateFrom)) {
           return false;
-        } else if (filters.dateTo && screeningDate > endOfDay(filters.dateTo)) {
+        } else if (filters.dateTo && s._parsedDatetime > endOfDay(filters.dateTo)) {
           return false;
         }
       }
 
-      // Time range filter (hour-based)
+      // Time range filter - uses pre-parsed hour
       if (filters.timeFrom !== null || filters.timeTo !== null) {
-        const hour = getHours(new Date(s.datetime));
-        if (filters.timeFrom !== null && hour < filters.timeFrom) {
+        if (filters.timeFrom !== null && s._hour < filters.timeFrom) {
           return false;
         }
-        if (filters.timeTo !== null && hour > filters.timeTo) {
+        if (filters.timeTo !== null && s._hour > filters.timeTo) {
           return false;
         }
       }
@@ -244,19 +256,17 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
         }
       }
 
-      // Time of day filter
+      // Time of day filter - uses pre-parsed hour
       if (filters.timesOfDay.length > 0) {
-        const hour = getHours(new Date(s.datetime));
-        const timeOfDay = getTimeOfDayFromHour(hour);
+        const timeOfDay = getTimeOfDayFromHour(s._hour);
         if (!filters.timesOfDay.includes(timeOfDay)) {
           return false;
         }
       }
 
-      // Only single showings per day across London
+      // Only single showings per day across London - uses pre-parsed dateKey
       if (filters.onlySingleShowings && singleShowingSet) {
-        const dateKey = format(startOfDay(new Date(s.datetime)), "yyyy-MM-dd");
-        const key = `${dateKey}|${s.film.id}`;
+        const key = `${s._dateKey}|${s.film.id}`;
         if (!singleShowingSet.has(key)) {
           return false;
         }
@@ -269,20 +279,21 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
 
       return true;
     });
-  }, [screenings, filters, hiddenFilmIds, mounted, cinemas]);
+  }, [parsedScreenings, filters, hiddenFilmIds, mounted, singleShowingSet, hideSeen, hideNotInterested, filmStatusesHydrated]);
 
   const activeFilterCount = mounted ? filters.getActiveFilterCount() : 0;
 
-  // Group screenings by date - must be before any conditional returns (React hooks rules)
+  // Group screenings by date - uses pre-parsed dateKey for performance
   const groupedByDate = useMemo(() => {
     const groups = new Map<string, { date: Date; screenings: Screening[] }>();
 
     for (const screening of filteredScreenings) {
-      const dateKey = format(startOfDay(new Date(screening.datetime)), "yyyy-MM-dd");
+      // Use pre-parsed dateKey to avoid Date construction
+      const dateKey = screening._dateKey;
 
       if (!groups.has(dateKey)) {
         groups.set(dateKey, {
-          date: startOfDay(new Date(screening.datetime)),
+          date: startOfDay(screening._parsedDatetime),
           screenings: [],
         });
       }
@@ -312,7 +323,7 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
         filmMap.get(screening.film.id)!.screenings.push(screening);
       }
 
-      // Compute film groups with counts
+      // Compute film groups with counts - uses pre-parsed datetime for performance
       const filmGroups: FilmGroup[] = Array.from(filmMap.values()).map((g) => {
         const uniqueCinemas = new Map(g.screenings.map((s) => [s.cinema.id, s.cinema]));
         const cinemaCount = uniqueCinemas.size;
@@ -330,8 +341,9 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
           screeningCount: g.screenings.length,
           cinemaCount,
           singleCinema,
+          // Use pre-parsed datetime to avoid repeated Date construction
           earliestTime: new Date(
-            Math.min(...g.screenings.map((s) => new Date(s.datetime).getTime()))
+            Math.min(...g.screenings.map((s) => (s as typeof s & { _parsedDatetime: Date })._parsedDatetime.getTime()))
           ),
           hasSpecialFormats: g.screenings.some((s) =>
             ["35mm", "70mm", "imax", "4k"].includes(s.format?.toLowerCase() || "")
