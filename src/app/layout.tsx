@@ -3,6 +3,7 @@ import { DM_Sans, JetBrains_Mono, Cormorant } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ClerkProvider } from "@clerk/nextjs";
+import * as Sentry from "@sentry/nextjs";
 import { Providers } from "@/components/providers";
 import { OrganizationSchema } from "@/components/seo/json-ld";
 import { Footer } from "@/components/layout/footer";
@@ -30,9 +31,14 @@ const BASE_URL = "https://postboxd.co.uk";
 
 /**
  * Comprehensive metadata for SEO and social sharing
- * Includes Open Graph, Twitter Cards, and verification tags
+ * Includes Open Graph, Twitter Cards, verification tags, and Sentry trace data
  */
-export const metadata: Metadata = {
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    // Sentry distributed tracing - propagates trace context to client
+    other: {
+      ...Sentry.getTraceData(),
+    },
   // Basic metadata
   title: {
     default: "Postboxd - London Cinema Calendar",
@@ -115,12 +121,13 @@ export const metadata: Metadata = {
   //   },
   // },
 
-  // App info
-  applicationName: "Postboxd",
-  authors: [{ name: "Postboxd" }],
-  generator: "Next.js",
-  category: "Entertainment",
-};
+    // App info
+    applicationName: "Postboxd",
+    authors: [{ name: "Postboxd" }],
+    generator: "Next.js",
+    category: "Entertainment",
+  };
+}
 
 /**
  * Viewport configuration
