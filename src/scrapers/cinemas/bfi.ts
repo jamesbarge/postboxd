@@ -99,59 +99,118 @@ export class BFIScraper {
     if (!this.page) throw new Error("Browser not initialized");
 
     const screenings: RawScreening[] = [];
-    const dates = this.generateDateRange(45); // Fetch next 45 days
 
-    console.log(`[${this.config.cinemaId}] Fetching ${dates.length} days of screenings via direct URL...`);
+    try {
+      // Navigate to the calendar page first
+      console.log(`[${this.config.cinemaId}] Opening calendar...`);
 
-    for (let i = 0; i < dates.length; i++) {
-      const date = dates[i];
-      const dateStr = this.formatDate(date);
-      const url = this.buildSearchUrl(dateStr);
+      await this.page.goto(`${this.venue.baseUrl}/default.asp`, {
+        waitUntil: "domcontentloaded",
+        timeout: 60000,
+      });
 
-      try {
-        console.log(`[${this.config.cinemaId}] Fetching ${dateStr} (${i + 1}/${dates.length})...`);
-
-        await this.page.goto(url, {
-          waitUntil: "domcontentloaded",
-          timeout: 30000,
-        });
-
-        // Wait for potential Cloudflare challenge
-        await waitForCloudflare(this.page, 15);
-        await this.page.waitForTimeout(1500);
-
-        const html = await this.page.content();
-
-        // Check if we got blocked
-        if (html.includes("challenge-platform") || html.includes("Checking your browser")) {
-          console.log(`[${this.config.cinemaId}] Cloudflare challenge on ${dateStr}, waiting...`);
-          await this.page.waitForTimeout(5000);
-          continue;
-        }
-
-        // Debug: check what's in the HTML
-        if (i < 3) {
-          const hasMain = html.includes('<main');
-          const hasResults = html.includes('Search results');
-          const hasChallenge = html.includes('challenge-platform');
-          console.log(`[${this.config.cinemaId}] Page debug: main=${hasMain}, results=${hasResults}, challenge=${hasChallenge}, length=${html.length}`);
-        }
-
-        const dayScreenings = this.parseSearchResults(html);
-
-        if (dayScreenings.length > 0) {
-          console.log(`[${this.config.cinemaId}] ${dateStr}: ${dayScreenings.length} screenings`);
-          screenings.push(...dayScreenings);
-        }
-
-        // Small delay between requests to avoid rate limiting
-        await this.page.waitForTimeout(this.config.delayBetweenRequests || 2000);
-
-      } catch (error) {
-        console.error(`[${this.config.cinemaId}] Error fetching ${dateStr}:`, error);
-        // Continue with next date
-        await this.page.waitForTimeout(3000);
+      const cloudflareCleared = await waitForCloudflare(this.page, 45);
+      if (!cloudflareCleared) {
+        console.log(`[${this.config.cinemaId}] Cloudflare did not clear, trying anyway...`);
       }
+
+      await this.page.waitForTimeout(3000);
+
+      // Navigate to months with future screenings
+      // Need enough active dates to indicate a real month of programming (not just stale past dates)
+      const minActiveDatesThreshold = 5;
+      const maxMonthsToAdvance = 3;
+      for (let monthOffset = 0; monthOffset < maxMonthsToAdvance; monthOffset++) {
+        // Check if current month has enough active dates
+        const activeCells = await this.page.$$('[role="gridcell"]:not([aria-disabled="true"])');
+
+        if (activeCells.length >= minActiveDatesThreshold) {
+          console.log(`[${this.config.cinemaId}] Found ${activeCells.length} active dates in current month view`);
+          break;
+        }
+
+        console.log(`[${this.config.cinemaId}] Only ${activeCells.length} active dates (need ${minActiveDatesThreshold}+), advancing...`);
+
+        // Not enough active dates, try next month
+        const nextMonthBtn = this.page.getByRole('button', { name: 'Next month' });
+        if (await nextMonthBtn.count() > 0) {
+          console.log(`[${this.config.cinemaId}] Clicking Next month...`);
+          await nextMonthBtn.click();
+          await this.page.waitForTimeout(1500);
+        } else {
+          console.log(`[${this.config.cinemaId}] Next month button not found`);
+          break;
+        }
+      }
+
+      // Now scrape up to 2 months of calendar data
+      for (let monthNum = 0; monthNum < 2; monthNum++) {
+        console.log(`[${this.config.cinemaId}] Scraping month ${monthNum + 1}...`);
+
+        // Get all clickable date cells
+        const dateCells = await this.page.$$('[role="gridcell"]:not([aria-disabled="true"])');
+        console.log(`[${this.config.cinemaId}] Found ${dateCells.length} active dates`);
+
+        // Click each date to get screenings
+        for (let i = 0; i < dateCells.length; i++) {
+          try {
+            // Re-query cells after navigation
+            const currentCells = await this.page.$$('[role="gridcell"]:not([aria-disabled="true"])');
+            if (i >= currentCells.length) break;
+
+            const cell = currentCells[i];
+            const dateLabel = await cell.getAttribute("aria-label") || await cell.textContent() || "";
+
+            console.log(`[${this.config.cinemaId}] Clicking: ${dateLabel.trim()}...`);
+
+            await cell.click();
+            await this.page.waitForTimeout(2000);
+            await waitForCloudflare(this.page, 10);
+
+            const html = await this.page.content();
+            const dayScreenings = this.parseSearchResults(html);
+
+            if (dayScreenings.length > 0) {
+              console.log(`[${this.config.cinemaId}] ${dateLabel.trim()}: ${dayScreenings.length} screenings`);
+              screenings.push(...dayScreenings);
+            }
+
+            // Return to calendar
+            await this.page.goto(`${this.venue.baseUrl}/default.asp`, {
+              waitUntil: "domcontentloaded",
+              timeout: 30000,
+            });
+            await waitForCloudflare(this.page, 10);
+            await this.page.waitForTimeout(1500);
+
+            // Navigate back to the same month we were scraping
+            for (let m = 0; m <= monthNum; m++) {
+              const nextBtn = this.page.getByRole('button', { name: 'Next month' });
+              if (await nextBtn.count() > 0) {
+                await nextBtn.click();
+                await this.page.waitForTimeout(1000);
+              }
+            }
+          } catch (error) {
+            console.error(`[${this.config.cinemaId}] Error on date ${i}:`, error);
+            // Try to recover
+            await this.page.goto(`${this.venue.baseUrl}/default.asp`, {
+              waitUntil: "domcontentloaded",
+              timeout: 30000,
+            }).catch(() => {});
+            await this.page.waitForTimeout(2000);
+          }
+        }
+
+        // Move to next month for next iteration
+        const nextMonthButton = this.page.getByRole('button', { name: 'Next month' });
+        if (await nextMonthButton.count() > 0) {
+          await nextMonthButton.click();
+          await this.page.waitForTimeout(1500);
+        }
+      }
+    } catch (error) {
+      console.error(`[${this.config.cinemaId}] Calendar navigation failed:`, error);
     }
 
     return screenings;

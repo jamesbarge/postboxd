@@ -43,9 +43,11 @@ This document describes how each cinema website is scraped, including the approa
 
 **Approach:**
 - Uses Playwright with stealth plugin to bypass Cloudflare protection
-- Navigates to calendar page, clicks date cells to load results
+- Navigates to calendar page, clicks date cells to load search results
+- **Month Navigation:** Calendar shows current month first - must click "Next month" to reach future dates
 - Selector for dates: `[role="gridcell"]:not([aria-disabled="true"])`
 - Selector for films: `$('a[href*="loadArticle"]')`
+- **Next Month button:** Use `page.getByRole('button', { name: 'Next month' })` (NOT `page.$()` with `:has-text()`)
 
 **Date Format:** `"Friday 19 December 2025 14:30"`
 
@@ -58,6 +60,24 @@ This document describes how each cinema website is scraped, including the approa
 - Page has no `<main>` element - search for `loadArticle` links directly
 - Datetime found in grandparent element text, not siblings
 - Screen info: NFT1-4, IMAX, Studio
+- **Month threshold:** Requires ≥5 active date cells before stopping month advancement (handles month-end when most dates are past)
+
+**Critical Fix (Dec 2025):**
+The calendar may show mostly past dates at month-end. For example, on Dec 31st, only Dec 2nd might be clickable (a past date). The scraper must:
+1. Check if current month has ≥5 active dates
+2. If not, click "Next month" to advance to a month with future screenings
+3. Use Playwright's `getByRole()` API for the button - the `:has-text()` pseudo-selector does NOT work with `page.$()` (CSS selectors only)
+
+```typescript
+// CORRECT - uses Playwright's getByRole API
+const nextMonthBtn = this.page.getByRole('button', { name: 'Next month' });
+if (await nextMonthBtn.count() > 0) {
+  await nextMonthBtn.click();
+}
+
+// WRONG - :has-text() is not valid CSS, only works with page.locator()
+const btn = await this.page.$('button:has-text("Next month")'); // Returns null!
+```
 
 ---
 
