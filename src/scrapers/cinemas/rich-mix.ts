@@ -10,12 +10,14 @@
  * 3 screens: Screen 1 (181 seats), Screen 2 (132 seats), Screen 3 (59 seats)
  */
 
-import type { RawScreening } from "../types";
+import type { RawScreening, ScraperConfig, CinemaScraper } from "../types";
 
-const RICHMIX_CONFIG = {
+const RICHMIX_CONFIG: ScraperConfig & { apiUrl: string } = {
   cinemaId: "rich-mix",
-  apiUrl: "https://richmix.org.uk/whats-on/cinema/?ajax=1&json=1",
   baseUrl: "https://richmix.org.uk",
+  apiUrl: "https://richmix.org.uk/whats-on/cinema/?ajax=1&json=1",
+  requestsPerMinute: 30,
+  delayBetweenRequests: 500,
 };
 
 // API response types
@@ -48,11 +50,6 @@ interface RichMixFilm {
   spektrix_data?: {
     instances?: SpektrixInstances;
   };
-}
-
-export interface CinemaScraper {
-  config: { cinemaId: string };
-  scrape(): Promise<RawScreening[]>;
 }
 
 export class RichMixScraper implements CinemaScraper {
@@ -148,6 +145,20 @@ export class RichMixScraper implements CinemaScraper {
     );
 
     return date;
+  }
+
+  async healthCheck(): Promise<boolean> {
+    try {
+      const response = await fetch(this.config.baseUrl, {
+        method: "HEAD",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; PicturesBot/1.0)",
+        },
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 }
 

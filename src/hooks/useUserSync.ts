@@ -2,7 +2,13 @@
 
 /**
  * useUserSync Hook
- * Manages sync lifecycle between localStorage and server
+ * Unified sync lifecycle manager for all user data:
+ * - Film statuses (watchlist, seen, not interested)
+ * - User preferences (cinemas, view settings)
+ * - Filter settings
+ * - Festival follows and schedule
+ *
+ * Features:
  * - Initial sync on sign-in
  * - Debounced sync on store changes
  * - Online/offline awareness
@@ -14,11 +20,17 @@ import { useUser } from "@clerk/nextjs";
 import { useFilmStatus } from "@/stores/film-status";
 import { usePreferences } from "@/stores/preferences";
 import { useFilters } from "@/stores/filters";
+import { useFestivalStore } from "@/stores/festival";
 import {
   performFullSync,
   pushFilmStatuses,
   pushPreferences,
 } from "@/lib/sync/user-sync-service";
+import {
+  performFestivalSync,
+  pushFestivalFollows,
+  pushFestivalSchedule,
+} from "@/lib/sync/festival-sync-service";
 import {
   trackUserAuthenticated,
   trackAnonymousToAuthenticated,
@@ -33,13 +45,20 @@ let storedAnonymousId: string | null = null;
 
 export function useUserSync() {
   const { isSignedIn, isLoaded } = useUser();
+
+  // Debounce refs for all sync operations
   const filmStatusDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const preferencesDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const followsDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const scheduleDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   const isSyncingRef = useRef(false);
-  // Track if initial sync has been performed (using ref instead of global variable for SSR safety)
   const initialSyncPerformedRef = useRef(false);
 
-  // Debounced film status push
+  // ============================================================================
+  // Debounced push functions
+  // ============================================================================
+
   const debouncedPushFilmStatuses = useCallback(() => {
     if (filmStatusDebounceRef.current) {
       clearTimeout(filmStatusDebounceRef.current);
@@ -51,7 +70,6 @@ export function useUserSync() {
     }, SYNC_DEBOUNCE_MS);
   }, []);
 
-  // Debounced preferences push
   const debouncedPushPreferences = useCallback(() => {
     if (preferencesDebounceRef.current) {
       clearTimeout(preferencesDebounceRef.current);
@@ -63,7 +81,32 @@ export function useUserSync() {
     }, SYNC_DEBOUNCE_MS);
   }, []);
 
-  // Capture anonymous ID before sign-in
+  const debouncedPushFollows = useCallback(() => {
+    if (followsDebounceRef.current) {
+      clearTimeout(followsDebounceRef.current);
+    }
+    followsDebounceRef.current = setTimeout(() => {
+      if (!isSyncingRef.current) {
+        pushFestivalFollows();
+      }
+    }, SYNC_DEBOUNCE_MS);
+  }, []);
+
+  const debouncedPushSchedule = useCallback(() => {
+    if (scheduleDebounceRef.current) {
+      clearTimeout(scheduleDebounceRef.current);
+    }
+    scheduleDebounceRef.current = setTimeout(() => {
+      if (!isSyncingRef.current) {
+        pushFestivalSchedule();
+      }
+    }, SYNC_DEBOUNCE_MS);
+  }, []);
+
+  // ============================================================================
+  // Anonymous ID capture (for conversion tracking)
+  // ============================================================================
+
   useEffect(() => {
     if (!isLoaded) return;
 
@@ -76,7 +119,10 @@ export function useUserSync() {
     }
   }, [isLoaded, isSignedIn]);
 
+  // ============================================================================
   // Initial sync on sign-in
+  // ============================================================================
+
   useEffect(() => {
     if (!isLoaded) return;
 
@@ -85,11 +131,15 @@ export function useUserSync() {
       isSyncingRef.current = true;
       initialSyncPerformedRef.current = true;
 
-      performFullSync("sign_in").then((success) => {
+      // Perform both user data and festival syncs in parallel
+      Promise.all([
+        performFullSync("sign_in"),
+        performFestivalSync(),
+      ]).then(([userSyncSuccess]) => {
         isSyncingRef.current = false;
 
         // Track anonymous-to-authenticated conversion
-        if (success && storedAnonymousId) {
+        if (userSyncSuccess && storedAnonymousId) {
           const currentId = getDistinctId();
 
           // Only alias if the IDs are different (user was anonymous before)
@@ -120,6 +170,10 @@ export function useUserSync() {
     }
   }, [isSignedIn, isLoaded]);
 
+  // ============================================================================
+  // Store subscriptions
+  // ============================================================================
+
   // Subscribe to film status changes
   useEffect(() => {
     if (!isSignedIn) return;
@@ -139,7 +193,7 @@ export function useUserSync() {
     };
   }, [isSignedIn, debouncedPushFilmStatuses]);
 
-  // Subscribe to preferences changes
+  // Subscribe to preferences and filter changes
   useEffect(() => {
     if (!isSignedIn) return;
 
@@ -184,20 +238,57 @@ export function useUserSync() {
     };
   }, [isSignedIn, debouncedPushPreferences]);
 
-  // Online/offline awareness - sync when coming back online
+  // Subscribe to festival store changes
+  useEffect(() => {
+    if (!isSignedIn) return;
+
+    const unsubscribe = useFestivalStore.subscribe((state, prevState) => {
+      // Check if follows changed
+      if (state.follows !== prevState.follows) {
+        debouncedPushFollows();
+      }
+
+      // Check if schedule changed
+      if (state.schedule !== prevState.schedule) {
+        debouncedPushSchedule();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      if (followsDebounceRef.current) {
+        clearTimeout(followsDebounceRef.current);
+      }
+      if (scheduleDebounceRef.current) {
+        clearTimeout(scheduleDebounceRef.current);
+      }
+    };
+  }, [isSignedIn, debouncedPushFollows, debouncedPushSchedule]);
+
+  // ============================================================================
+  // Online/offline awareness
+  // ============================================================================
+
   useEffect(() => {
     if (!isSignedIn) return;
 
     const handleOnline = () => {
       console.log("[Sync] Back online, performing sync...");
-      performFullSync("manual");
+      // Sync all data when coming back online
+      Promise.all([
+        performFullSync("manual"),
+        performFestivalSync(),
+      ]);
     };
 
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
   }, [isSignedIn]);
 
+  // ============================================================================
   // Cleanup on unmount
+  // ============================================================================
+
   useEffect(() => {
     return () => {
       if (filmStatusDebounceRef.current) {
@@ -205,6 +296,12 @@ export function useUserSync() {
       }
       if (preferencesDebounceRef.current) {
         clearTimeout(preferencesDebounceRef.current);
+      }
+      if (followsDebounceRef.current) {
+        clearTimeout(followsDebounceRef.current);
+      }
+      if (scheduleDebounceRef.current) {
+        clearTimeout(scheduleDebounceRef.current);
       }
     };
   }, []);

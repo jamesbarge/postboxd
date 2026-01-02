@@ -14,12 +14,14 @@
  */
 
 import { chromium } from "playwright";
-import type { RawScreening } from "../types";
+import type { RawScreening, ScraperConfig, CinemaScraper } from "../types";
 
-const REGENT_STREET_CONFIG = {
+const REGENT_STREET_CONFIG: ScraperConfig & { programmeUrl: string } = {
   cinemaId: "regent-street-cinema",
   baseUrl: "https://www.regentstreetcinema.com",
   programmeUrl: "https://www.regentstreetcinema.com/programme/",
+  requestsPerMinute: 10,
+  delayBetweenRequests: 1500,
 };
 
 // GraphQL response types
@@ -38,11 +40,6 @@ interface RegentStreetShowing {
   past: boolean;
   screenId: string;
   movie: RegentStreetMovie;
-}
-
-export interface CinemaScraper {
-  config: { cinemaId: string };
-  scrape(): Promise<RawScreening[]>;
 }
 
 export class RegentStreetScraper implements CinemaScraper {
@@ -146,6 +143,20 @@ export class RegentStreetScraper implements CinemaScraper {
       return screenings;
     } finally {
       await browser.close();
+    }
+  }
+
+  async healthCheck(): Promise<boolean> {
+    try {
+      const response = await fetch(this.config.baseUrl, {
+        method: "HEAD",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; PicturesBot/1.0)",
+        },
+      });
+      return response.ok;
+    } catch {
+      return false;
     }
   }
 }

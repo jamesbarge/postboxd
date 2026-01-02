@@ -10,12 +10,14 @@
  */
 
 import { chromium, type Page } from "playwright";
-import type { RawScreening } from "../types";
+import type { RawScreening, ScraperConfig, CinemaScraper } from "../types";
 
-const PHOENIX_CONFIG = {
+const PHOENIX_CONFIG: ScraperConfig & { graphqlUrl: string } = {
   cinemaId: "phoenix-east-finchley",
   baseUrl: "https://www.phoenixcinema.co.uk",
   graphqlUrl: "https://www.phoenixcinema.co.uk/graphql",
+  requestsPerMinute: 10,
+  delayBetweenRequests: 1500,
 };
 
 // GraphQL response types
@@ -36,11 +38,6 @@ interface PhoenixShowing {
   published: boolean;
   past: boolean;
   movie: PhoenixMovie;
-}
-
-export interface CinemaScraper {
-  config: { cinemaId: string };
-  scrape(): Promise<RawScreening[]>;
 }
 
 export class PhoenixScraper implements CinemaScraper {
@@ -164,6 +161,20 @@ export class PhoenixScraper implements CinemaScraper {
       return screenings;
     } finally {
       await browser.close();
+    }
+  }
+
+  async healthCheck(): Promise<boolean> {
+    try {
+      const response = await fetch(this.config.baseUrl, {
+        method: "HEAD",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; PicturesBot/1.0)",
+        },
+      });
+      return response.ok;
+    } catch {
+      return false;
     }
   }
 }

@@ -159,14 +159,13 @@ describe("usePreferences store", () => {
 
   describe("map actions", () => {
     const testMapArea = {
-      bounds: {
-        north: 51.6,
-        south: 51.4,
-        east: 0.1,
-        west: -0.2,
-      },
-      center: { lat: 51.5, lng: -0.05 },
-      zoom: 12,
+      type: "polygon" as const,
+      paths: [
+        { lat: 51.6, lng: -0.2 },  // NW
+        { lat: 51.6, lng: 0.1 },   // NE
+        { lat: 51.4, lng: 0.1 },   // SE
+        { lat: 51.4, lng: -0.2 },  // SW
+      ],
     };
 
     describe("setMapArea", () => {
