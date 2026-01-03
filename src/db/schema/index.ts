@@ -11,3 +11,6 @@ export * from "./festivals";
 export * from "./users";
 export * from "./user-film-statuses";
 export * from "./user-preferences";
+
+// Admin & data completeness schemas
+export * from "./admin";

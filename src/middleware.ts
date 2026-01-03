@@ -1,17 +1,20 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 /**
  * Clerk Middleware Configuration
  *
- * Currently all routes are PUBLIC (beta phase).
- * This middleware adds Clerk context to all requests
- * without protecting any routes.
- *
- * Future: Add route protection for subscription features:
- * - /account - User profile, subscription management
- * - /api/sync - Sync localStorage to database
+ * Public routes: Most of the app is public
+ * Protected routes: /admin/* requires authentication
  */
-export default clerkMiddleware();
+
+const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
+
+export default clerkMiddleware(async (auth, req) => {
+  // Protect admin routes - require sign-in
+  if (isAdminRoute(req)) {
+    await auth.protect();
+  }
+});
 
 export const config = {
   matcher: [
