@@ -43,3 +43,6 @@ next-env.d.ts
 # Playwright MCP screenshots
 .playwright-mcp/
 .worktrees
+
+# Private documentation (sensitive business docs)
+docs/
