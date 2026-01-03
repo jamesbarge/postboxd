@@ -48,6 +48,7 @@ interface DaySectionProps {
       posterUrl?: string | null;
       runtime?: number | null;
       isRepertory: boolean;
+      tmdbRating?: number | null;
     };
     cinema: {
       id: string;
@@ -89,11 +90,17 @@ export const DaySection = memo(function DaySection({ date, screenings, filmGroup
   const { primary, secondary } = formatDateHeader(date);
 
   // Memoize sorting to prevent recalculation on every render (for screening view)
-  // Uses pre-parsed datetime if available, falls back to parsing
+  // Primary sort: TMDB rating (descending), Secondary: time (ascending)
   const sortedScreenings = useMemo(
     () =>
       [...screenings].sort((a, b) => {
-        // Use pre-parsed datetime if available (from CalendarView optimization)
+        // Primary sort: by rating (higher first, nulls last)
+        const aRating = a.film.tmdbRating ?? 0;
+        const bRating = b.film.tmdbRating ?? 0;
+        if (aRating !== bRating) {
+          return bRating - aRating; // Descending (higher rating first)
+        }
+        // Secondary sort: by time (earlier first)
         const aTime = (a as typeof a & { _parsedDatetime?: Date })._parsedDatetime?.getTime()
           ?? new Date(a.datetime).getTime();
         const bTime = (b as typeof b & { _parsedDatetime?: Date })._parsedDatetime?.getTime()
