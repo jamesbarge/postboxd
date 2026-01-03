@@ -94,8 +94,8 @@ export function FilmHeader({ film }: FilmHeaderProps) {
       )}
 
       {/* Content */}
-      <div className="relative pt-8 sm:pt-16 px-4">
-        <div className="max-w-4xl mx-auto">
+      <div className="relative pt-8 sm:pt-16">
+        <div className="max-w-4xl mx-auto px-4">
           <div className="flex flex-col sm:flex-row gap-6">
             {/* Poster */}
             <div className="shrink-0 mx-auto sm:mx-0">
@@ -257,11 +257,11 @@ export function FilmHeader({ film }: FilmHeaderProps) {
 
           {/* Synopsis */}
           {film.synopsis && (
-            <div className="mt-8 max-w-2xl">
+            <div className="mt-8">
               <h2 className="text-sm font-medium text-text-tertiary uppercase tracking-wider mb-2">
                 Synopsis
               </h2>
-              <p className="text-text-secondary leading-relaxed">
+              <p className="text-text-secondary leading-relaxed max-w-prose">
                 {film.synopsis}
               </p>
             </div>
