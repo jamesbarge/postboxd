@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle, XCircle, Zap, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
+import { ReScrapeButton } from "./components/re-scrape-button";
 
 export const dynamic = "force-dynamic";
 
@@ -319,15 +320,15 @@ function AnomalyCard({ anomaly }: { anomaly: DetectedAnomaly }) {
           >
             View Screenings →
           </Link>
-          <Button variant="ghost" size="sm" className="ml-auto">
-            Re-scrape
-          </Button>
-          <Button variant="secondary" size="sm">
-            AI Verify
-          </Button>
-          <Button variant="ghost" size="sm">
-            Dismiss
-          </Button>
+          <div className="ml-auto flex gap-2">
+            <ReScrapeButton cinemaId={anomaly.cinemaId} />
+            <Button variant="secondary" size="sm">
+              AI Verify
+            </Button>
+            <Button variant="ghost" size="sm">
+              Dismiss
+            </Button>
+          </div>
         </div>
       </div>
     </Card>
