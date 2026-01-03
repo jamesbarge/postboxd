@@ -13,7 +13,7 @@ import { WebSiteSchema, FAQSchema } from "@/components/seo/json-ld";
 export const dynamic = "force-dynamic";
 
 // Cache screenings query for 60 seconds (keyed by date to bust cache at midnight)
-// Load 3 days initially (~2500 screenings) - more loaded via client-side
+// Load all screenings for 3 days (~2500) - never hide films that are showing
 const getCachedScreenings = unstable_cache(
   async (dateKey: string) => {
     const now = new Date();
@@ -56,8 +56,8 @@ const getCachedScreenings = unstable_cache(
           lte(screenings.datetime, endDate)
         )
       )
-      .orderBy(screenings.datetime)
-      .limit(2500); // 3 days has ~2500 screenings across all cinemas
+      .orderBy(screenings.datetime);
+      // No limit - date range constraint ensures reasonable size (~2500 for 3 days)
   },
   ["home-screenings-v2"], // New cache key
   { revalidate: 60, tags: ["screenings"] }
