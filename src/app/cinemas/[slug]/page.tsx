@@ -97,7 +97,7 @@ export default async function CinemaPage({ params }: CinemaPageProps) {
       question: `Where is ${cinemaData.name} located?`,
       answer: cinemaData.address
         ? `${cinemaData.name} is located at ${cinemaData.address.street}, ${cinemaData.address.area}, ${cinemaData.address.postcode}, London.`
-        : `${cinemaData.name} is an independent cinema in London.`,
+        : `${cinemaData.name} is a cinema in London.`,
     },
     {
       question: `How do I book tickets at ${cinemaData.name}?`,

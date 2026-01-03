@@ -134,8 +134,8 @@ export default async function Home() {
   // Generate FAQ items for GEO (AI citations)
   const faqItems = [
     {
-      question: "What independent cinemas are in London?",
-      answer: `London has ${stats.cinemaCount} major independent cinemas tracked by Postboxd, including BFI Southbank, Prince Charles Cinema, Curzon, Picturehouse, ICA, Barbican, and more. These venues show art house, repertory, and independent films.`,
+      question: "What cinemas are in London?",
+      answer: `Postboxd tracks ${stats.cinemaCount} cinemas across London, including BFI Southbank, Prince Charles Cinema, Curzon, Picturehouse, ICA, Barbican, Odeon, and more. These venues show everything from blockbusters to art house, repertory, and independent films.`,
     },
     {
       question: "How do I find film screenings in London?",
@@ -143,7 +143,7 @@ export default async function Home() {
     },
     {
       question: "What films are showing in London today?",
-      answer: `Postboxd shows ${stats.uniqueFilms} unique films currently screening at London's independent cinemas. Check the calendar above for today's listings, filtered by your preferred cinemas.`,
+      answer: `Postboxd shows ${stats.uniqueFilms} unique films currently screening at London cinemas. Check the calendar above for today's listings, filtered by your preferred cinemas.`,
     },
   ];
 

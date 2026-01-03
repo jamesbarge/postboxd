@@ -83,7 +83,7 @@ export default function TermsOfServicePage() {
             </h2>
             <p className="text-text-secondary mb-4">
               Pictures is a cinema calendar that aggregates film screening
-              information from independent cinemas in London. The Service
+              information from cinemas in London. The Service
               provides:
             </p>
             <ul className="list-disc list-inside text-text-secondary space-y-1">

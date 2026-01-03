@@ -1,6 +1,6 @@
 # Pictures
 
-**The London Cinema Calendar** — Aggregating screenings from 20+ independent cinemas into one unified view.
+**The London Cinema Calendar** — Aggregating screenings from 20+ cinemas into one unified view.
 
 **Live at [pictures.london](https://pictures.london)**
 
@@ -8,7 +8,7 @@
 
 ## What is this?
 
-London has an incredible independent cinema scene, but finding what's showing means checking 20 different websites. Pictures solves this by scraping listings from venues like BFI Southbank, Prince Charles Cinema, Curzon, Picturehouse, ICA, Barbican, and more — presenting everything in one filterable calendar.
+London has an incredible cinema scene, but finding what's showing means checking 20 different websites. Pictures solves this by scraping listings from venues like BFI Southbank, Prince Charles Cinema, Curzon, Picturehouse, ICA, Barbican, Odeon, and more — presenting everything in one filterable calendar.
 
 ### Features
 

@@ -67,11 +67,11 @@ export default async function AboutPage() {
   const faqItems = [
     {
       question: "What is Pictures?",
-      answer: `Pictures is a cinema calendar that aggregates film listings from ${stats.cinemaCount} independent London cinemas. We update daily with the latest showtimes from venues like BFI Southbank, Prince Charles Cinema, Curzon, and more.`,
+      answer: `Pictures is a cinema calendar that aggregates film listings from ${stats.cinemaCount} London cinemas. We update daily with the latest showtimes from venues like BFI Southbank, Prince Charles Cinema, Curzon, Odeon, and more.`,
     },
     {
       question: "Which cinemas does Pictures cover?",
-      answer: `We cover ${stats.cinemaCount} independent cinemas including ${allCinemas
+      answer: `We cover ${stats.cinemaCount} cinemas including ${allCinemas
         .slice(0, 6)
         .map((c) => c.name)
         .join(", ")}, and more.`,
@@ -84,7 +84,7 @@ export default async function AboutPage() {
     {
       question: "Is Pictures free to use?",
       answer:
-        "Yes, Pictures is completely free. We aggregate listings to help film lovers discover screenings across London's independent cinema scene.",
+        "Yes, Pictures is completely free. We aggregate listings to help film lovers discover screenings across London's cinema scene.",
     },
   ];
 
@@ -124,7 +124,7 @@ export default async function AboutPage() {
         {/* Answer-first summary */}
         <p className="text-lg text-text-secondary mb-8">
           Pictures is the definitive cinema calendar for London cinephiles. We
-          aggregate listings from {stats.cinemaCount} independent cinemas into
+          aggregate listings from {stats.cinemaCount} cinemas into
           one unified view, helping you discover screenings you might otherwise
           miss.
         </p>

@@ -45,7 +45,7 @@ export async function generateMetadata(): Promise<Metadata> {
     template: "%s | Pictures",
   },
   description:
-    "Find screenings at London's independent cinemas. Daily updated listings from BFI Southbank, Prince Charles Cinema, Curzon, Picturehouse, ICA, Barbican, and 15+ venues.",
+    "Find screenings at London cinemas. Daily updated listings from BFI Southbank, Prince Charles Cinema, Curzon, Picturehouse, ICA, Barbican, Odeon, and 20+ venues.",
   keywords: [
     "London cinema",
     "film listings",
@@ -73,7 +73,7 @@ export async function generateMetadata(): Promise<Metadata> {
     siteName: "Pictures",
     title: "Pictures - London Cinema Calendar",
     description:
-      "Find screenings at London's independent cinemas. BFI, Prince Charles, Curzon, Picturehouse, ICA, and more. Updated daily.",
+      "Find screenings at London cinemas. BFI, Prince Charles, Curzon, Picturehouse, ICA, Odeon, and more. Updated daily.",
     images: [
       {
         url: `${BASE_URL}/og-image.png`,
@@ -89,7 +89,7 @@ export async function generateMetadata(): Promise<Metadata> {
     card: "summary_large_image",
     title: "Pictures - London Cinema Calendar",
     description:
-      "Find screenings at London's independent cinemas. Updated daily with showtimes from 20+ venues.",
+      "Find screenings at London cinemas. Updated daily with showtimes from 20+ venues.",
     images: [`${BASE_URL}/og-image.png`],
     creator: "@pictureslondon",
   },

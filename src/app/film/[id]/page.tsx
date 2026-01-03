@@ -173,7 +173,7 @@ export async function generateMetadata({ params }: FilmPageProps) {
   if (f.directors && f.directors.length > 0) {
     description += ` directed by ${f.directors.slice(0, 2).join(" and ")}`;
   }
-  description += ` at London's independent cinemas.`;
+  description += ` at London cinemas.`;
   if (f.synopsis) {
     // Truncate synopsis for description
     const synopsisPreview = f.synopsis.slice(0, 150);

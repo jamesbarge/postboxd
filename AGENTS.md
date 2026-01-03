@@ -1,5 +1,5 @@
 ## Project Overview
-London cinema calendar app (Pictures) that scrapes screening data from independent cinemas and displays it in a unified calendar view. Production: https://pictures.london
+London cinema calendar app (Pictures) that scrapes screening data from cinemas across London and displays it in a unified calendar view. We cover all cinemas with a special focus on independent venues. Production: https://pictures.london
 
 ## Tech Stack
 - Next.js 16 App Router, React 19

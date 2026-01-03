@@ -53,7 +53,7 @@ export function OrganizationSchema() {
     url: BASE_URL,
     logo: `${BASE_URL}/logo.png`,
     description:
-      "The definitive cinema calendar for London cinephiles. Find screenings at independent cinemas including BFI Southbank, Prince Charles Cinema, ICA, and more.",
+      "The definitive cinema calendar for London cinephiles. Find screenings at cinemas including BFI Southbank, Prince Charles Cinema, ICA, Odeon, and more.",
     sameAs: [],
     contactPoint: {
       "@type": "ContactPoint",
@@ -77,7 +77,7 @@ export function WebSiteSchema() {
     alternateName: "Pictures London Cinema Calendar",
     url: BASE_URL,
     description:
-      "Find and track film screenings at London's independent cinemas. Updated daily with showtimes from BFI, Prince Charles, Curzon, Picturehouse, and more.",
+      "Find and track film screenings at London cinemas. Updated daily with showtimes from BFI, Prince Charles, Curzon, Picturehouse, Odeon, and more.",
     potentialAction: {
       "@type": "SearchAction",
       target: {
@@ -269,7 +269,7 @@ export function MovieTheaterSchema({ cinema }: { cinema: Cinema }) {
     url: `${BASE_URL}/cinemas/${cinema.id}`,
     description:
       cinema.description ||
-      `${cinema.name} is an independent cinema in London.`,
+      `${cinema.name} is a cinema in London.`,
   };
 
   if (cinema.address) {

@@ -21,16 +21,16 @@ export const revalidate = 3600; // Revalidate hourly
 const BASE_URL = "https://postboxd.co.uk";
 
 export const metadata: Metadata = {
-  title: "London Independent Cinemas - Complete Directory",
+  title: "London Cinemas - Complete Directory",
   description:
-    "Directory of 15+ independent cinemas in London. Find art house, repertory, and indie film venues including BFI Southbank, Prince Charles Cinema, Curzon, Picturehouse, ICA, and more.",
+    "Directory of 20+ cinemas in London. Find art house, repertory, mainstream, and indie film venues including BFI Southbank, Prince Charles Cinema, Curzon, Picturehouse, Odeon, and more.",
   alternates: {
     canonical: "/cinemas",
   },
   openGraph: {
-    title: "London Independent Cinemas - Complete Directory",
+    title: "London Cinemas - Complete Directory",
     description:
-      "Find London's best independent cinemas. Art house, repertory, and indie film venues with daily updated listings.",
+      "Find London's best cinemas. Art house, repertory, mainstream, and indie film venues with daily updated listings.",
     url: `${BASE_URL}/cinemas`,
     type: "website",
   },
@@ -78,16 +78,16 @@ export default async function CinemasPage() {
   // FAQ items for GEO
   const faqItems = [
     {
-      question: "What independent cinemas are in London?",
-      answer: `London has ${cinemasWithStats.length} major independent cinemas including ${cinemasWithStats
+      question: "What cinemas are in London?",
+      answer: `London has ${cinemasWithStats.length} major cinemas including ${cinemasWithStats
         .slice(0, 5)
         .map((c) => c.name)
-        .join(", ")}, and more. These venues show art house, repertory, and independent films.`,
+        .join(", ")}, and more. These venues show everything from blockbusters to art house, repertory, and independent films.`,
     },
     {
-      question: "What is the best independent cinema in London?",
+      question: "What is the best cinema in London?",
       answer:
-        "London's top independent cinemas include BFI Southbank (the UK's leading film institution), Prince Charles Cinema (known for repertory and cult films), and the ICA Cinema (experimental and art house). The best choice depends on your taste in films.",
+        "London's top cinemas include BFI Southbank (the UK's leading film institution), Prince Charles Cinema (known for repertory and cult films), and the ICA Cinema (experimental and art house). The best choice depends on your taste in films.",
     },
     {
       question: "Where can I watch classic films in London?",
@@ -112,8 +112,8 @@ export default async function CinemasPage() {
     <div className="min-h-screen bg-background-primary pb-12">
       {/* Structured Data */}
       <ItemListSchema
-        name="London Independent Cinemas"
-        description="Complete directory of independent cinemas in London"
+        name="London Cinemas"
+        description="Complete directory of cinemas in London"
         items={listItems}
       />
       <FAQSchema items={faqItems} />
@@ -133,13 +133,13 @@ export default async function CinemasPage() {
 
           {/* H1 - critical for SEO */}
           <h1 className="text-3xl font-display text-text-primary mb-4">
-            London Independent Cinemas
+            London Cinemas
           </h1>
 
           {/* Answer-first summary for GEO */}
           <p className="text-text-secondary max-w-2xl">
-            Discover {cinemasWithStats.length} independent cinemas across
-            London. Currently showing {totalScreenings} upcoming screenings of
+            Discover {cinemasWithStats.length} cinemas across London. Currently
+            showing {totalScreenings} upcoming screenings from blockbusters to
             art house, repertory, and independent films. Updated daily.
           </p>
         </div>
