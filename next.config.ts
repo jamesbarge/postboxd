@@ -5,6 +5,16 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   // Increase timeout for ISR static generation (querying 3000 screenings)
   staticPageGenerationTimeout: 120,
+  // Exclude Playwright/Puppeteer from webpack bundling (used by scrapers via Inngest)
+  serverExternalPackages: [
+    "playwright",
+    "playwright-core",
+    "puppeteer-extra",
+    "puppeteer-extra-plugin",
+    "puppeteer-extra-plugin-stealth",
+    "clone-deep",
+    "merge-deep",
+  ],
   experimental: {
     optimizePackageImports: ["lucide-react", "date-fns"],
   },

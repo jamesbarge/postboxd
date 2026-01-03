@@ -71,13 +71,13 @@ export function ReScrapeButton({ cinemaId, variant = "ghost" }: ReScrapeButtonPr
       {status === "loading" && (
         <>
           <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-          Scraping...
+          Queueing...
         </>
       )}
       {status === "success" && (
         <>
           <Check className="w-4 h-4 mr-1" />
-          Started
+          Queued
         </>
       )}
       {status === "error" && (

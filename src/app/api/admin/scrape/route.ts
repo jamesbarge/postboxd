@@ -1,11 +1,11 @@
 /**
  * Admin Scrape API
- * Triggers a scraper for a specific cinema
+ * Triggers a scraper for a specific cinema via Inngest
  * POST /api/admin/scrape
  */
 
 import { auth } from "@clerk/nextjs/server";
-import { spawn } from "child_process";
+import { inngest } from "@/inngest/client";
 
 // Map cinema IDs (from database) to CLI scraper IDs
 const CINEMA_TO_SCRAPER: Record<string, string> = {
@@ -39,6 +39,7 @@ const CINEMA_TO_SCRAPER: Record<string, string> = {
   "curzon-victoria": "curzon",
   "curzon-hoxton": "curzon",
   "curzon-kingston": "curzon",
+  "curzon-aldgate": "curzon",
   // Picturehouse venues
   "picturehouse-central": "picturehouse",
   "hackney-picturehouse": "picturehouse",
@@ -83,27 +84,26 @@ export async function POST(request: Request) {
       );
     }
 
-    // Spawn the scraper as a background process
-    // We don't wait for it - just kick it off
-    const child = spawn("npm", ["run", "scrape", scraperId], {
-      cwd: process.cwd(),
-      detached: true,
-      stdio: "ignore",
-      env: { ...process.env },
+    // Send event to Inngest to trigger the scraper
+    const { ids } = await inngest.send({
+      name: "scraper/run",
+      data: {
+        cinemaId,
+        scraperId,
+        triggeredBy: userId,
+      },
     });
-
-    // Unref so we don't block the API response
-    child.unref();
 
     return Response.json({
       success: true,
-      message: `Scraper started for ${cinemaId}`,
+      message: `Scraper queued for ${cinemaId}`,
       scraperId,
+      eventId: ids[0],
     });
   } catch (error) {
-    console.error("Error starting scraper:", error);
+    console.error("Error triggering scraper:", error);
     return Response.json(
-      { error: "Failed to start scraper" },
+      { error: "Failed to trigger scraper" },
       { status: 500 }
     );
   }

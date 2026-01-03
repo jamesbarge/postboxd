@@ -1,0 +1,430 @@
+import { inngest } from "./client";
+import { saveScreenings, ensureCinemaExists } from "@/scrapers/pipeline";
+import type { RawScreening } from "@/scrapers/types";
+
+// Venue definition with required website for Inngest scrapers
+interface InnggestVenueDefinition {
+  id: string;
+  name: string;
+  shortName: string;
+  website: string;
+  address: { street: string; area: string; postcode: string };
+  features: string[];
+}
+
+/**
+ * Scraper Registry
+ * Maps cinema IDs to their scraper configurations
+ *
+ * Note: Playwright-based scrapers require a browser runtime.
+ * On Vercel serverless, only API/Cheerio-based scrapers will work.
+ * For Playwright scrapers, use a dedicated server or cloud browser service.
+ */
+
+interface ScraperResult {
+  venueId: string;
+  added: number;
+  updated: number;
+  failed: number;
+}
+
+interface ScraperEntry {
+  venue: InnggestVenueDefinition;
+  /** Whether this scraper requires Playwright (won't work on Vercel serverless) */
+  requiresPlaywright: boolean;
+  /** The scrape function */
+  scrape: () => Promise<ScraperResult[]>;
+}
+
+// Helper to create a scraper entry for independent cinemas
+function createIndependentEntry(
+  venue: InnggestVenueDefinition,
+  requiresPlaywright: boolean,
+  scraperFactory: () => Promise<{ scrape: () => Promise<RawScreening[]> }>
+): ScraperEntry {
+  return {
+    venue,
+    requiresPlaywright,
+    scrape: async () => {
+      await ensureCinemaExists(venue);
+      const scraper = await scraperFactory();
+      const screenings = await scraper.scrape();
+      const result = await saveScreenings(venue.id, screenings);
+      return [{
+        venueId: venue.id,
+        added: result.added,
+        updated: result.updated,
+        failed: result.failed,
+      }];
+    },
+  };
+}
+
+// Lazy-loaded scraper registry
+const getScraperRegistry = (): Record<string, () => Promise<ScraperEntry>> => ({
+  // ============================================================================
+  // Independent Cinemas (Cheerio-based - work on Vercel)
+  // ============================================================================
+  "rio-dalston": async () => {
+    const { createRioScraper } = await import("@/scrapers/cinemas/rio");
+    return createIndependentEntry(
+      {
+        id: "rio-dalston",
+        name: "Rio Cinema",
+        shortName: "Rio",
+        website: "https://riocinema.org.uk",
+        address: { street: "107 Kingsland High Street", area: "Dalston", postcode: "E8 2PB" },
+        features: ["independent", "repertory", "bar", "35mm", "art-deco"],
+      },
+      false,
+      async () => createRioScraper()
+    );
+  },
+
+  "prince-charles": async () => {
+    const { createPrinceCharlesScraper } = await import("@/scrapers/cinemas/prince-charles");
+    return createIndependentEntry(
+      {
+        id: "prince-charles",
+        name: "Prince Charles Cinema",
+        shortName: "PCC",
+        website: "https://princecharlescinema.com",
+        address: { street: "7 Leicester Place", area: "Leicester Square", postcode: "WC2H 7BY" },
+        features: ["independent", "repertory", "sing-along", "marathons", "35mm", "70mm"],
+      },
+      false,
+      async () => createPrinceCharlesScraper()
+    );
+  },
+
+  "ica": async () => {
+    const { createICAScraper } = await import("@/scrapers/cinemas/ica");
+    return createIndependentEntry(
+      {
+        id: "ica",
+        name: "Institute of Contemporary Arts",
+        shortName: "ICA",
+        website: "https://www.ica.art",
+        address: { street: "The Mall", area: "St James's", postcode: "SW1Y 5AH" },
+        features: ["independent", "repertory", "art-house", "gallery"],
+      },
+      false,
+      async () => createICAScraper()
+    );
+  },
+
+  "genesis": async () => {
+    const { createGenesisScraper } = await import("@/scrapers/cinemas/genesis");
+    return createIndependentEntry(
+      {
+        id: "genesis",
+        name: "Genesis Cinema",
+        shortName: "Genesis",
+        website: "https://genesiscinema.co.uk",
+        address: { street: "93-95 Mile End Road", area: "Mile End", postcode: "E1 4UJ" },
+        features: ["independent", "affordable", "5-screens"],
+      },
+      false,
+      async () => createGenesisScraper()
+    );
+  },
+
+  "peckhamplex": async () => {
+    const { createPeckhamplexScraper } = await import("@/scrapers/cinemas/peckhamplex");
+    return createIndependentEntry(
+      {
+        id: "peckhamplex",
+        name: "Peckhamplex",
+        shortName: "Plex",
+        website: "https://peckhamplex.london",
+        address: { street: "95A Rye Lane", area: "Peckham", postcode: "SE15 4ST" },
+        features: ["independent", "affordable", "community"],
+      },
+      false,
+      async () => createPeckhamplexScraper()
+    );
+  },
+
+  "nickel": async () => {
+    const { createNickelScraper } = await import("@/scrapers/cinemas/the-nickel");
+    return createIndependentEntry(
+      {
+        id: "nickel",
+        name: "The Nickel",
+        shortName: "Nickel",
+        website: "https://thenickel.co.uk",
+        address: { street: "194 Upper Street", area: "Islington", postcode: "N1 1RQ" },
+        features: ["independent", "bar", "restaurant"],
+      },
+      false,
+      async () => createNickelScraper()
+    );
+  },
+
+  "garden": async () => {
+    const { createGardenCinemaScraper } = await import("@/scrapers/cinemas/garden");
+    return createIndependentEntry(
+      {
+        id: "garden",
+        name: "Garden Cinema",
+        shortName: "Garden",
+        website: "https://thegardencinema.co.uk",
+        address: { street: "39-41 Parker Street", area: "Covent Garden", postcode: "WC2B 5PQ" },
+        features: ["independent", "art-house", "bar", "luxury"],
+      },
+      false,
+      async () => createGardenCinemaScraper()
+    );
+  },
+
+  "castle": async () => {
+    const { createCastleScraper } = await import("@/scrapers/cinemas/castle");
+    return createIndependentEntry(
+      {
+        id: "castle",
+        name: "Castle Cinema",
+        shortName: "Castle",
+        website: "https://thecastlecinema.com",
+        address: { street: "64-66 Brooksby's Walk", area: "Hackney", postcode: "E9 6DA" },
+        features: ["independent", "community", "cafe-bar"],
+      },
+      false,
+      async () => createCastleScraper()
+    );
+  },
+
+  "phoenix": async () => {
+    const { createPhoenixScraper } = await import("@/scrapers/cinemas/phoenix");
+    return createIndependentEntry(
+      {
+        id: "phoenix",
+        name: "Phoenix Cinema",
+        shortName: "Phoenix",
+        website: "https://phoenixcinema.co.uk",
+        address: { street: "52 High Road", area: "East Finchley", postcode: "N2 9PJ" },
+        features: ["independent", "historic", "repertory", "art-deco"],
+      },
+      false,
+      async () => createPhoenixScraper()
+    );
+  },
+
+  "rich-mix": async () => {
+    const { createRichMixScraper } = await import("@/scrapers/cinemas/rich-mix");
+    return createIndependentEntry(
+      {
+        id: "rich-mix",
+        name: "Rich Mix",
+        shortName: "Rich Mix",
+        website: "https://richmix.org.uk",
+        address: { street: "35-47 Bethnal Green Road", area: "Shoreditch", postcode: "E1 6LA" },
+        features: ["independent", "arts-centre", "community", "world-cinema"],
+      },
+      false,
+      async () => createRichMixScraper()
+    );
+  },
+
+  // ============================================================================
+  // Playwright-based Cinemas (require browser - won't work on Vercel serverless)
+  // ============================================================================
+  "bfi-southbank": async () => {
+    const { createBFIScraper } = await import("@/scrapers/cinemas/bfi");
+    return createIndependentEntry(
+      {
+        id: "bfi-southbank",
+        name: "BFI Southbank",
+        shortName: "BFI",
+        website: "https://www.bfi.org.uk/bfi-southbank",
+        address: { street: "Belvedere Road", area: "South Bank", postcode: "SE1 8XT" },
+        features: ["independent", "repertory", "archive", "world-cinema"],
+      },
+      true, // Requires Playwright
+      async () => createBFIScraper("bfi-southbank")
+    );
+  },
+
+  "barbican": async () => {
+    const { createBarbicanScraper } = await import("@/scrapers/cinemas/barbican");
+    return createIndependentEntry(
+      {
+        id: "barbican",
+        name: "Barbican Cinema",
+        shortName: "Barbican",
+        website: "https://www.barbican.org.uk",
+        address: { street: "Silk Street", area: "City of London", postcode: "EC2Y 8DS" },
+        features: ["arts-centre", "repertory", "world-cinema", "accessible"],
+      },
+      true, // Requires Playwright
+      async () => createBarbicanScraper()
+    );
+  },
+
+  "electric-portobello": async () => {
+    const { createElectricScraper } = await import("@/scrapers/cinemas/electric");
+    return createIndependentEntry(
+      {
+        id: "electric-portobello",
+        name: "Electric Cinema Portobello",
+        shortName: "Electric",
+        website: "https://www.electriccinema.co.uk",
+        address: { street: "191 Portobello Road", area: "Notting Hill", postcode: "W11 2ED" },
+        features: ["independent", "luxury", "historic", "bar"],
+      },
+      true, // Requires Playwright
+      async () => createElectricScraper()
+    );
+  },
+
+  "lexi": async () => {
+    const { createLexiScraper } = await import("@/scrapers/cinemas/lexi");
+    return createIndependentEntry(
+      {
+        id: "lexi",
+        name: "The Lexi Cinema",
+        shortName: "Lexi",
+        website: "https://thelexicinema.co.uk",
+        address: { street: "194B Chamberlayne Road", area: "Kensal Rise", postcode: "NW10 3JU" },
+        features: ["independent", "community", "charity", "art-deco"],
+      },
+      true, // Requires Playwright
+      async () => createLexiScraper()
+    );
+  },
+});
+
+// Chain cinema IDs map to their chain scraper
+const CHAIN_CINEMA_MAPPING: Record<string, string> = {
+  // Curzon venues
+  "curzon-soho": "curzon",
+  "curzon-mayfair": "curzon",
+  "curzon-bloomsbury": "curzon",
+  "curzon-victoria": "curzon",
+  "curzon-hoxton": "curzon",
+  "curzon-kingston": "curzon",
+  "curzon-aldgate": "curzon",
+  // Picturehouse venues
+  "picturehouse-central": "picturehouse",
+  "hackney-picturehouse": "picturehouse",
+  "crouch-end-picturehouse": "picturehouse",
+  "east-dulwich-picturehouse": "picturehouse",
+  "greenwich-picturehouse": "picturehouse",
+  "finsbury-park-picturehouse": "picturehouse",
+  "gate-picturehouse": "picturehouse",
+  "picturehouse-ritzy": "picturehouse",
+  "clapham-picturehouse": "picturehouse",
+  // Everyman venues
+  "everyman-belsize-park": "everyman",
+  "everyman-baker-street": "everyman",
+  "everyman-canary-wharf": "everyman",
+  "everyman-hampstead": "everyman",
+  "everyman-kings-cross": "everyman",
+  "everyman-maida-vale": "everyman",
+  "everyman-muswell-hill": "everyman",
+  "everyman-screen-on-the-green": "everyman",
+  "everyman-stratford": "everyman",
+};
+
+/**
+ * Inngest Function: Run Cinema Scraper
+ *
+ * Triggered by the "scraper/run" event.
+ * Runs the appropriate scraper for the given cinema.
+ */
+export const runCinemaScraper = inngest.createFunction(
+  {
+    id: "run-cinema-scraper",
+    retries: 2,
+  },
+  { event: "scraper/run" },
+  async ({ event, step }) => {
+    const { cinemaId, scraperId, triggeredBy } = event.data;
+    const startTime = Date.now();
+
+    console.log(`[Inngest] Starting scraper for ${cinemaId} (triggered by ${triggeredBy})`);
+
+    // Check if this is a chain cinema
+    const chainId = CHAIN_CINEMA_MAPPING[cinemaId];
+    if (chainId) {
+      // Chain cinemas require Playwright, which doesn't work on Vercel serverless
+      return {
+        cinemaId,
+        scraperId,
+        triggeredBy,
+        success: false,
+        error: `Chain cinema ${cinemaId} requires Playwright which is not available on Vercel serverless. Run the chain scraper (${chainId}) from a local machine or dedicated server.`,
+        requiresPlaywright: true,
+        durationMs: Date.now() - startTime,
+      };
+    }
+
+    // Get the scraper entry
+    const registry = getScraperRegistry();
+    const getEntry = registry[cinemaId];
+
+    if (!getEntry) {
+      return {
+        cinemaId,
+        scraperId,
+        triggeredBy,
+        success: false,
+        error: `No scraper configured for cinema: ${cinemaId}`,
+        durationMs: Date.now() - startTime,
+      };
+    }
+
+    // Load the scraper entry
+    const entry = await step.run("load-scraper", async () => {
+      const e = await getEntry();
+      return {
+        requiresPlaywright: e.requiresPlaywright,
+        venueName: e.venue.name,
+      };
+    });
+
+    // Check if Playwright is required
+    if (entry.requiresPlaywright) {
+      return {
+        cinemaId,
+        scraperId,
+        triggeredBy,
+        success: false,
+        error: `${entry.venueName} scraper requires Playwright which is not available on Vercel serverless. Run this scraper from a local machine or dedicated server.`,
+        requiresPlaywright: true,
+        durationMs: Date.now() - startTime,
+      };
+    }
+
+    // Run the scraper
+    const result = await step.run("run-scraper", async () => {
+      const scraperEntry = await getEntry();
+      const results = await scraperEntry.scrape();
+      const totalAdded = results.reduce((sum, r) => sum + r.added, 0);
+      const totalUpdated = results.reduce((sum, r) => sum + r.updated, 0);
+      const totalFailed = results.reduce((sum, r) => sum + r.failed, 0);
+      return {
+        venues: results,
+        totalAdded,
+        totalUpdated,
+        totalFailed,
+      };
+    });
+
+    console.log(`[Inngest] Scraper completed for ${cinemaId}:`, result);
+
+    return {
+      cinemaId,
+      scraperId,
+      triggeredBy,
+      success: true,
+      totalAdded: result.totalAdded,
+      totalUpdated: result.totalUpdated,
+      totalFailed: result.totalFailed,
+      venues: result.venues,
+      durationMs: Date.now() - startTime,
+    };
+  }
+);
+
+// Export all functions for the serve handler
+export const functions = [runCinemaScraper];
