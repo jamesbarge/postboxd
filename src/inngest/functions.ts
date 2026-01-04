@@ -1,6 +1,7 @@
 import { inngest } from "./client";
 import { saveScreenings, ensureCinemaExists } from "@/scrapers/pipeline";
 import type { RawScreening } from "@/scrapers/types";
+import * as Sentry from "@sentry/nextjs";
 
 // Venue definition with required website for Inngest scrapers
 interface InnggestVenueDefinition {
@@ -476,5 +477,134 @@ export const scheduledScrapeAll = inngest.createFunction(
   }
 );
 
+/**
+ * Inngest Function: Handle Function Failures
+ *
+ * Global handler for all Inngest function failures.
+ * Reports to Sentry and optionally sends Slack notifications.
+ */
+export const handleFunctionFailure = inngest.createFunction(
+  {
+    id: "handle-function-failure",
+    retries: 0, // Don't retry failure handlers
+  },
+  { event: "inngest/function.failed" },
+  async ({ event, step }) => {
+    const { function_id, run_id, error } = event.data;
+    const originalEvent = event.data.event;
+
+    // Skip alerting for expected Playwright failures (they're informational, not errors)
+    const errorMessage = error?.message || "";
+    if (errorMessage.includes("requires Playwright")) {
+      console.log(`[Inngest] Skipping alert for expected Playwright limitation: ${function_id}`);
+      return { skipped: true, reason: "playwright-limitation" };
+    }
+
+    console.error(`[Inngest] Function failed: ${function_id}`, {
+      run_id,
+      error,
+      originalEvent,
+    });
+
+    // Step 1: Report to Sentry
+    await step.run("report-to-sentry", async () => {
+      Sentry.captureException(new Error(`Inngest function failed: ${function_id}`), {
+        tags: {
+          inngest_function: function_id,
+          inngest_run_id: run_id,
+        },
+        extra: {
+          error,
+          originalEvent,
+        },
+      });
+    });
+
+    // Step 2: Send Slack notification (if configured)
+    const slackWebhookUrl = process.env.SLACK_WEBHOOK_URL;
+    if (slackWebhookUrl) {
+      await step.run("send-slack-notification", async () => {
+        const cinemaId = originalEvent?.data?.cinemaId || "unknown";
+        const triggeredBy = originalEvent?.data?.triggeredBy || "unknown";
+
+        const payload = {
+          blocks: [
+            {
+              type: "header",
+              text: {
+                type: "plain_text",
+                text: "🚨 Scraper Failure Alert",
+                emoji: true,
+              },
+            },
+            {
+              type: "section",
+              fields: [
+                {
+                  type: "mrkdwn",
+                  text: `*Function:*\n${function_id}`,
+                },
+                {
+                  type: "mrkdwn",
+                  text: `*Cinema:*\n${cinemaId}`,
+                },
+                {
+                  type: "mrkdwn",
+                  text: `*Triggered By:*\n${triggeredBy}`,
+                },
+                {
+                  type: "mrkdwn",
+                  text: `*Run ID:*\n\`${run_id}\``,
+                },
+              ],
+            },
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `*Error:*\n\`\`\`${errorMessage.slice(0, 500)}\`\`\``,
+              },
+            },
+            {
+              type: "actions",
+              elements: [
+                {
+                  type: "button",
+                  text: {
+                    type: "plain_text",
+                    text: "View in Inngest",
+                    emoji: true,
+                  },
+                  url: `https://app.inngest.com/env/production/runs/${run_id}`,
+                },
+              ],
+            },
+          ],
+        };
+
+        const response = await fetch(slackWebhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          console.error("[Inngest] Failed to send Slack notification:", response.status);
+        }
+
+        return { sent: response.ok };
+      });
+    }
+
+    return {
+      handled: true,
+      function_id,
+      run_id,
+      reportedToSentry: true,
+      slackNotified: !!slackWebhookUrl,
+    };
+  }
+);
+
 // Export all functions for the serve handler
-export const functions = [runCinemaScraper, scheduledScrapeAll];
+export const functions = [runCinemaScraper, scheduledScrapeAll, handleFunctionFailure];
