@@ -60,6 +60,20 @@ function createIndependentEntry(
   };
 }
 
+// Cheerio-based cinemas that can run on Vercel serverless (no browser required)
+const CHEERIO_CINEMAS = [
+  "rio-dalston",
+  "prince-charles",
+  "ica",
+  "genesis",
+  "peckhamplex",
+  "nickel",
+  "garden",
+  "castle",
+  "rich-mix",
+  // Note: "phoenix" removed - it uses Playwright
+];
+
 // Lazy-loaded scraper registry
 const getScraperRegistry = (): Record<string, () => Promise<ScraperEntry>> => ({
   // ============================================================================
@@ -204,7 +218,7 @@ const getScraperRegistry = (): Record<string, () => Promise<ScraperEntry>> => ({
         address: { street: "52 High Road", area: "East Finchley", postcode: "N2 9PJ" },
         features: ["independent", "historic", "repertory", "art-deco"],
       },
-      false,
+      true, // Requires Playwright
       async () => createPhoenixScraper()
     );
   },
@@ -426,5 +440,41 @@ export const runCinemaScraper = inngest.createFunction(
   }
 );
 
+/**
+ * Inngest Function: Scheduled Scrape All
+ *
+ * Runs daily at 6:00 AM UTC to scrape all Cheerio-based cinemas.
+ * Fans out to individual scraper runs via events.
+ */
+export const scheduledScrapeAll = inngest.createFunction(
+  {
+    id: "scheduled-scrape-all",
+    retries: 0, // Don't retry the scheduler itself - individual scrapers have their own retries
+  },
+  { cron: "0 6 * * *" }, // 6:00 AM UTC daily
+  async ({ step }) => {
+    console.log(`[Inngest] Starting scheduled scrape for ${CHEERIO_CINEMAS.length} cinemas`);
+
+    // Create events for all Cheerio-based scrapers
+    const events = CHEERIO_CINEMAS.map((cinemaId) => ({
+      name: "scraper/run" as const,
+      data: {
+        cinemaId,
+        scraperId: cinemaId,
+        triggeredBy: "scheduled-cron",
+      },
+    }));
+
+    // Fan out to individual scraper runs
+    await step.sendEvent("trigger-scrapers", events);
+
+    return {
+      triggered: CHEERIO_CINEMAS.length,
+      cinemas: CHEERIO_CINEMAS,
+      scheduledAt: new Date().toISOString(),
+    };
+  }
+);
+
 // Export all functions for the serve handler
-export const functions = [runCinemaScraper];
+export const functions = [runCinemaScraper, scheduledScrapeAll];
