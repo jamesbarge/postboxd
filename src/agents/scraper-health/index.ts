@@ -213,51 +213,205 @@ Respond with JSON:
 }
 
 /**
- * Run health check on all cinemas
+ * Run health check on all cinemas (batched - single AI call)
  */
 export async function runHealthCheckAllCinemas(): Promise<
   AgentResult<ScraperHealthReport[]>
 > {
   const startTime = Date.now();
-  const reports: ScraperHealthReport[] = [];
-  let totalTokens = 0;
+  const config = AGENT_CONFIGS.scraperHealth;
 
-  const cinemas = await db.select().from(schema.cinemas);
-
-  for (const cinema of cinemas) {
-    // Get recent screening count for this cinema
+  try {
+    const cinemas = await db.select().from(schema.cinemas);
     const now = new Date();
-    const [result] = await db
-      .select({ count: count() })
-      .from(schema.screenings)
-      .where(
-        and(
-          eq(schema.screenings.cinemaId, cinema.id),
-          gte(schema.screenings.datetime, now)
-        )
-      );
+    const sevenDaysAgo = subDays(now, 7);
 
-    const screeningCount = Number(result?.count ?? 0);
+    // Gather all cinema data in parallel
+    const cinemaData = await Promise.all(
+      cinemas.map(async (cinema) => {
+        // Get current screening count
+        const [currentResult] = await db
+          .select({ count: count() })
+          .from(schema.screenings)
+          .where(
+            and(
+              eq(schema.screenings.cinemaId, cinema.id),
+              gte(schema.screenings.datetime, now)
+            )
+          );
 
-    const healthResult = await analyzeScraperHealth(cinema.id, screeningCount);
+        // Get historical counts
+        const historicalData = await db
+          .select({
+            date: sql<string>`DATE(${schema.screenings.scrapedAt})`,
+            count: count(),
+          })
+          .from(schema.screenings)
+          .where(
+            and(
+              eq(schema.screenings.cinemaId, cinema.id),
+              gte(schema.screenings.scrapedAt, sevenDaysAgo)
+            )
+          )
+          .groupBy(sql`DATE(${schema.screenings.scrapedAt})`);
 
-    if (healthResult.success && healthResult.data) {
-      reports.push(healthResult.data);
-      totalTokens += healthResult.tokensUsed;
+        const screeningCount = Number(currentResult?.count ?? 0);
+        const averageCount =
+          historicalData.length > 0
+            ? historicalData.reduce((sum, d) => sum + Number(d.count), 0) /
+              historicalData.length
+            : screeningCount;
+
+        const percentChange =
+          averageCount > 0
+            ? ((screeningCount - averageCount) / averageCount) * 100
+            : 0;
+
+        return {
+          id: cinema.id,
+          name: cinema.name,
+          screeningCount,
+          averageCount,
+          percentChange,
+        };
+      })
+    );
+
+    // Build batched prompt
+    const cinemaList = cinemaData
+      .map(
+        (c, i) =>
+          `${i + 1}. ${c.name} (${c.id}): ${c.screeningCount} screenings (avg: ${c.averageCount.toFixed(1)}, change: ${c.percentChange.toFixed(1)}%)`
+      )
+      .join("\n");
+
+    const prompt = `Analyze the health of all cinema scrapers. For each cinema, determine if there are anomalies.
+
+Cinemas:
+${cinemaList}
+
+Rules:
+- A drop of >50% from average is suspicious
+- A drop of >80% should block the scrape
+- Zero screenings is always an anomaly
+- Small cinemas (avg <10) may naturally have high variance
+
+For EACH cinema, respond with a JSON array:
+[
+  {
+    "cinemaId": "cinema-id",
+    "anomalyScore": 0-1,
+    "anomalyDetected": boolean,
+    "shouldBlockScrape": boolean,
+    "warnings": ["list of issues"],
+    "recommendation": "brief recommendation"
+  },
+  ...
+]
+
+Only include cinemas with anomalies or notable issues. If a cinema looks healthy, you can omit it or include with anomalyDetected: false.`;
+
+    // Single AI call for all cinemas
+    const client = new Anthropic();
+    const response = await client.messages.create({
+      model: config.model,
+      max_tokens: 4096,
+      system: CINEMA_AGENT_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const tokensUsed =
+      (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+
+    // Parse response
+    let aiResults: Array<{
+      cinemaId: string;
+      anomalyScore: number;
+      anomalyDetected: boolean;
+      shouldBlockScrape: boolean;
+      warnings: string[];
+      recommendation: string;
+    }> = [];
+
+    try {
+      const responseText = response.content
+        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .map((block) => block.text)
+        .join("");
+
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        aiResults = JSON.parse(jsonMatch[0]);
+      }
+    } catch (parseError) {
+      console.error("Failed to parse batched response:", parseError);
     }
+
+    // Build reports for all cinemas
+    const reports: ScraperHealthReport[] = cinemaData.map((cinema) => {
+      const aiResult = aiResults.find((r) => r.cinemaId === cinema.id);
+
+      const report: ScraperHealthReport = {
+        cinemaId: cinema.id,
+        cinemaName: cinema.name,
+        scrapedAt: now,
+        screeningCount: cinema.screeningCount,
+        averageCountLast7Days: cinema.averageCount,
+        percentChange: cinema.percentChange,
+        anomalyScore: aiResult?.anomalyScore || 0,
+        anomalyDetected: aiResult?.anomalyDetected || false,
+        shouldBlockScrape: aiResult?.shouldBlockScrape || false,
+        warnings: aiResult?.warnings || [],
+        recommendation: aiResult?.recommendation || "",
+      };
+
+      // Apply heuristic checks
+      if (cinema.percentChange < -50 && cinema.averageCount > 10) {
+        report.anomalyDetected = true;
+        if (!report.warnings.some((w) => w.includes("drop"))) {
+          report.warnings.push(
+            `Large drop: ${cinema.percentChange.toFixed(1)}% decrease from average`
+          );
+        }
+        if (cinema.percentChange < -80) {
+          report.shouldBlockScrape = true;
+          report.anomalyScore = Math.max(report.anomalyScore, 0.9);
+        }
+      }
+
+      if (cinema.screeningCount === 0) {
+        report.anomalyDetected = true;
+        report.shouldBlockScrape = true;
+        report.anomalyScore = 1.0;
+        if (!report.warnings.some((w) => w.includes("Zero"))) {
+          report.warnings.push("Zero screenings - scraper likely broken");
+        }
+      }
+
+      return report;
+    });
+
+    const anomalies = reports.filter((r) => r.anomalyDetected);
+    console.log(
+      `[${AGENT_NAME}] Checked ${reports.length} cinemas, found ${anomalies.length} anomalies`
+    );
+
+    return {
+      success: true,
+      data: reports,
+      tokensUsed,
+      executionTimeMs: Date.now() - startTime,
+      agentName: AGENT_NAME,
+      timestamp: new Date(),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      tokensUsed: 0,
+      executionTimeMs: Date.now() - startTime,
+      agentName: AGENT_NAME,
+      timestamp: new Date(),
+    };
   }
-
-  const anomalies = reports.filter((r) => r.anomalyDetected);
-  console.log(
-    `[${AGENT_NAME}] Checked ${reports.length} cinemas, found ${anomalies.length} anomalies`
-  );
-
-  return {
-    success: true,
-    data: reports,
-    tokensUsed: totalTokens,
-    executionTimeMs: Date.now() - startTime,
-    agentName: AGENT_NAME,
-    timestamp: new Date(),
-  };
 }
