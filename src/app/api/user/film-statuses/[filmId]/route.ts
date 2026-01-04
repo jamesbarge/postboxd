@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { userFilmStatuses } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth";
+import { syncUserToPostHog } from "@/lib/posthog-supabase-sync";
 
 interface RouteParams {
   params: Promise<{ filmId: string }>;
@@ -73,6 +74,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       });
     }
 
+    // Sync updated user metrics to PostHog (async, non-blocking)
+    syncUserToPostHog(userId).catch((err) => {
+      console.error("[PostHog Sync] Failed to sync user data:", err);
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
@@ -99,6 +105,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
           eq(userFilmStatuses.filmId, filmId)
         )
       );
+
+    // Sync updated user metrics to PostHog (async, non-blocking)
+    syncUserToPostHog(userId).catch((err) => {
+      console.error("[PostHog Sync] Failed to sync user data:", err);
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -8,6 +8,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import type { StoredPreferences, StoredFilters } from "@/db/schema/user-preferences";
 import { RateLimitError, handleApiError } from "@/lib/api-errors";
 import { captureServerEvent, setServerUserProperties } from "@/lib/posthog-server";
+import { syncUserToPostHog } from "@/lib/posthog-supabase-sync";
 
 interface FilmStatusPayload {
   filmId: string;
@@ -235,6 +236,12 @@ export async function POST(request: NextRequest) {
         preferencesUpdatedAt = serverPrefs.updatedAt.toISOString();
       }
     }
+
+    // Sync enriched user data to PostHog (async, non-blocking)
+    // This sends watchlist counts, engagement tier, etc. to PostHog for segmentation
+    syncUserToPostHog(userId).catch((err) => {
+      console.error("[PostHog Sync] Failed to sync user data:", err);
+    });
 
     return NextResponse.json({
       success: true,
