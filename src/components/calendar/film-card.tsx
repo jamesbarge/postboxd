@@ -40,7 +40,7 @@ interface FilmCardProps {
     shortName?: string | null;
   };
   earliestTime: Date;
-  hasSpecialFormats: boolean;
+  specialFormats: string[];
 }
 
 export const FilmCard = memo(function FilmCard({
@@ -48,7 +48,7 @@ export const FilmCard = memo(function FilmCard({
   screeningCount,
   cinemaCount,
   singleCinema,
-  hasSpecialFormats,
+  specialFormats,
 }: FilmCardProps) {
   const posthog = usePostHog();
 
@@ -71,7 +71,7 @@ export const FilmCard = memo(function FilmCard({
       film_year: film.year,
       screening_count: screeningCount,
       cinema_count: cinemaCount,
-      has_special_formats: hasSpecialFormats,
+      special_formats: specialFormats,
     });
   };
 
@@ -206,14 +206,6 @@ export const FilmCard = memo(function FilmCard({
           </div>
         )}
 
-        {/* Special format badge - shows if 35mm/70mm/IMAX available */}
-        {hasSpecialFormats && (
-          <div className="absolute top-3 right-3 z-10">
-            <span className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded bg-accent-gold/90 text-black backdrop-blur-sm">
-              Special Format
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Content - Compact below poster */}
@@ -246,6 +238,15 @@ export const FilmCard = memo(function FilmCard({
               <span className="text-[10px] text-text-tertiary">•</span>{" "}
               <span className="font-semibold text-accent-gold uppercase tracking-wide">
                 rep
+              </span>
+            </>
+          )}
+          {specialFormats.length > 0 && (
+            <>
+              {" "}
+              <span className="text-[10px] text-text-tertiary">•</span>{" "}
+              <span className="font-semibold text-accent-gold uppercase tracking-wide">
+                {specialFormats.join(" / ")}
               </span>
             </>
           )}

@@ -81,7 +81,7 @@ interface FilmGroup {
     shortName?: string | null;
   };
   earliestTime: Date;
-  hasSpecialFormats: boolean;
+  specialFormats: string[];
 }
 
 export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
@@ -339,6 +339,16 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
             }
           : undefined;
 
+        // Collect unique special formats with normalized display names
+        const formatSet = new Set<string>();
+        for (const s of g.screenings) {
+          const fmt = s.format?.toLowerCase() || "";
+          if (fmt.includes("70mm")) formatSet.add("70mm");
+          else if (fmt.includes("35mm")) formatSet.add("35mm");
+          else if (fmt.includes("imax")) formatSet.add("IMAX");
+          else if (fmt.includes("4k")) formatSet.add("4K");
+        }
+
         return {
           film: {
             id: g.film.id,
@@ -356,9 +366,7 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
           earliestTime: new Date(
             Math.min(...g.screenings.map((s) => (s as typeof s & { _parsedDatetime: Date })._parsedDatetime.getTime()))
           ),
-          hasSpecialFormats: g.screenings.some((s) =>
-            ["35mm", "70mm", "imax", "4k"].includes(s.format?.toLowerCase() || "")
-          ),
+          specialFormats: Array.from(formatSet),
         };
       });
 

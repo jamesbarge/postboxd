@@ -51,9 +51,29 @@ interface ScreeningCardProps {
   };
 }
 
+// Formats considered "special" and worth highlighting
+const SPECIAL_FORMATS = ["35mm", "70mm", "imax", "4k"];
+
+function getSpecialFormat(format: string | null | undefined): string | null {
+  if (!format) return null;
+  const lower = format.toLowerCase();
+  // Return the original format string if it matches a special format
+  for (const special of SPECIAL_FORMATS) {
+    if (lower.includes(special)) {
+      // Return a normalized display version
+      if (lower.includes("70mm")) return "70mm";
+      if (lower.includes("35mm")) return "35mm";
+      if (lower.includes("imax")) return "IMAX";
+      if (lower.includes("4k")) return "4K";
+    }
+  }
+  return null;
+}
+
 export const ScreeningCard = memo(function ScreeningCard({ screening }: ScreeningCardProps) {
   const { film, cinema, datetime } = screening;
   const time = format(new Date(datetime), "HH:mm");
+  const specialFormat = getSpecialFormat(screening.format);
   const formattedDate = format(new Date(datetime), "EEEE d MMMM");
   const posthog = usePostHog();
 
@@ -250,6 +270,14 @@ export const ScreeningCard = memo(function ScreeningCard({ screening }: Screenin
               <span className="text-[10px] text-text-tertiary">•</span>
               <span className="text-[10px] font-semibold text-accent-gold uppercase tracking-wide">
                 rep
+              </span>
+            </>
+          )}
+          {specialFormat && (
+            <>
+              <span className="text-[10px] text-text-tertiary">•</span>
+              <span className="text-[10px] font-semibold text-accent-gold uppercase tracking-wide">
+                {specialFormat}
               </span>
             </>
           )}

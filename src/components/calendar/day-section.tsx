@@ -28,7 +28,7 @@ interface FilmGroup {
     shortName?: string | null;
   };
   earliestTime: Date;
-  hasSpecialFormats: boolean;
+  specialFormats: string[];
 }
 
 interface DaySectionProps {
@@ -145,7 +145,7 @@ export const DaySection = memo(function DaySection({ date, screenings, filmGroup
               cinemaCount={group.cinemaCount}
               singleCinema={group.singleCinema}
               earliestTime={group.earliestTime}
-              hasSpecialFormats={group.hasSpecialFormats}
+              specialFormats={group.specialFormats}
             />
           ))
         ) : (
