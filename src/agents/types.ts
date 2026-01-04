@@ -128,7 +128,7 @@ export interface AgentResult<T> {
  * Configuration for running agents
  */
 export interface AgentConfig {
-  model: "claude-sonnet-4-20250514" | "claude-opus-4-5-20251101" | "claude-haiku-4-5-20251101";
+  model: "claude-sonnet-4-20250514" | "claude-opus-4-5-20251101" | "claude-3-5-haiku-20241022";
   maxTurns: number;
   maxTokens: number;
   enableAutoFix: boolean; // Whether to auto-fix issues or just flag
@@ -152,7 +152,7 @@ export const DEFAULT_AGENT_CONFIG: AgentConfig = {
 export const AGENT_CONFIGS = {
   linkVerification: {
     ...DEFAULT_AGENT_CONFIG,
-    model: "claude-haiku-4-5-20251101" as const, // Fast model for bulk verification
+    model: "claude-3-5-haiku-20241022" as const, // Fast model for bulk verification
     maxTurns: 10,
     confidenceThreshold: 0.7,
   },

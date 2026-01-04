@@ -91,7 +91,7 @@ export function calculateCost(
   const prices = {
     "claude-opus-4-5-20251101": { input: 0.015, output: 0.075 }, // per 1K tokens
     "claude-sonnet-4-20250514": { input: 0.003, output: 0.015 },
-    "claude-haiku-4-5-20251101": { input: 0.0008, output: 0.004 },
+    "claude-3-5-haiku-20241022": { input: 0.0008, output: 0.004 },
   };
 
   const price = prices[model];
