@@ -10,7 +10,7 @@ import { endOfDay, addDays } from "date-fns";
 import { ReachablePageClient } from "./reachable-page-client";
 
 export const metadata = {
-  title: "What Can I Catch? | Postboxd",
+  title: "What Can I Catch? | Pictures",
   description: "Find cinema screenings you can reach based on your location and schedule",
 };
 

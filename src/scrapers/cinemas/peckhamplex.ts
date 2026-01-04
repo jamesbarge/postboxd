@@ -1,12 +1,13 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck
 /**
  * Peckhamplex Cinema Scraper
  *
  * Affordable independent cinema in Peckham
  * Website: https://www.peckhamplex.london
  *
- * No public API - scrapes HTML listings
+ * Scraping approach:
+ * 1. Fetch /films/out-now to get list of film URLs
+ * 2. For each film page, extract screenings from .book-tickets section
+ * 3. Use <time datetime="..."> attributes for reliable datetime parsing
  */
 
 import * as cheerio from "cheerio";
@@ -20,7 +21,7 @@ export const PECKHAMPLEX_CONFIG: ScraperConfig = {
   cinemaId: "peckhamplex",
   baseUrl: "https://www.peckhamplex.london",
   requestsPerMinute: 10,
-  delayBetweenRequests: 2500,
+  delayBetweenRequests: 2000,
 };
 
 export const PECKHAMPLEX_VENUE = {
@@ -28,8 +29,8 @@ export const PECKHAMPLEX_VENUE = {
   name: "Peckhamplex",
   shortName: "Peckhamplex",
   area: "Peckham",
-  postcode: "SE15 5JR",
-  address: "95A Rye Lane",
+  postcode: "SE15 4ST",
+  address: "95a Rye Lane",
   features: ["independent", "affordable", "repertory"],
   website: "https://www.peckhamplex.london",
 };
@@ -47,17 +48,20 @@ export class PeckhamplexScraper implements CinemaScraper {
     try {
       const screenings: RawScreening[] = [];
 
-      // Peckhamplex has individual film pages and a schedule
-      // We'll scrape the main page and follow film links
-      const mainHtml = await this.fetchPage("/");
-      const filmUrls = this.extractFilmUrls(mainHtml);
+      // Fetch the films listing page
+      const listingHtml = await this.fetchPage("/films/out-now");
+      const filmUrls = this.extractFilmUrls(listingHtml);
 
-      console.log(`[peckhamplex] Found ${filmUrls.length} films`);
+      console.log(`[peckhamplex] Found ${filmUrls.length} films to scrape`);
 
       for (const filmUrl of filmUrls) {
         await this.delay();
-        const filmScreenings = await this.scrapeFilmPage(filmUrl);
-        screenings.push(...filmScreenings);
+        try {
+          const filmScreenings = await this.scrapeFilmPage(filmUrl);
+          screenings.push(...filmScreenings);
+        } catch (error) {
+          console.error(`[peckhamplex] Error scraping ${filmUrl}:`, error);
+        }
       }
 
       const validated = this.validate(screenings);
@@ -74,8 +78,10 @@ export class PeckhamplexScraper implements CinemaScraper {
     const url = path.startsWith("http") ? path : `${this.config.baseUrl}${path}`;
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-        "Accept": "text/html,application/xhtml+xml",
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-GB,en;q=0.9",
       },
     });
 
@@ -91,25 +97,15 @@ export class PeckhamplexScraper implements CinemaScraper {
     const urls: string[] = [];
     const seen = new Set<string>();
 
-    // Look for film page links - typically /film/film-name/
-    $("a[href*='/film/']").each((_, el) => {
+    // Find all film links on the listing page
+    $('a[href*="/film/"]').each((_, el) => {
       const href = $(el).attr("href");
       if (href && !seen.has(href)) {
         seen.add(href);
-        if (href.startsWith("/")) {
-          urls.push(href);
-        } else if (href.startsWith(this.config.baseUrl)) {
-          urls.push(href.replace(this.config.baseUrl, ""));
-        }
-      }
-    });
-
-    // Also check for event/screening links
-    $("a[href*='/screening/'], a[href*='/event/']").each((_, el) => {
-      const href = $(el).attr("href");
-      if (href && !seen.has(href)) {
-        seen.add(href);
-        if (href.startsWith("/")) {
+        // Normalize to full URL
+        if (href.startsWith("/film/")) {
+          urls.push(`${this.config.baseUrl}${href}`);
+        } else if (href.includes("peckhamplex.london/film/")) {
           urls.push(href);
         }
       }
@@ -118,215 +114,128 @@ export class PeckhamplexScraper implements CinemaScraper {
     return urls;
   }
 
-  private async scrapeFilmPage(filmPath: string): Promise<RawScreening[]> {
-    const html = await this.fetchPage(filmPath);
+  private async scrapeFilmPage(filmUrl: string): Promise<RawScreening[]> {
+    const html = await this.fetchPage(filmUrl);
     const $ = cheerio.load(html);
     const screenings: RawScreening[] = [];
 
-    // Extract film title
+    // Extract film title from h1.page-title or h1[itemprop="name"]
     const filmTitle = this.extractFilmTitle($);
     if (!filmTitle) {
-      console.log(`[peckhamplex] Could not extract title from ${filmPath}`);
+      console.log(`[peckhamplex] Could not extract title from ${filmUrl}`);
       return [];
     }
 
-    // Look for screening times
-    // Peckhamplex often lists times in a schedule format
-    $(".showtime, .screening-time, .time-slot, a[href*='book']").each((_, el) => {
-      const $el = $(el);
-      const text = $el.text().trim();
-      const href = $el.attr("href") || "";
+    // Extract format (2D, 3D) from metadata
+    const format = this.extractFormat($);
 
-      // Try to extract date and time
-      const datetime = this.extractDateTime($, $el, text);
+    // Find all screening times in the book-tickets section
+    // Each time element has datetime attribute like "2026-01-04T17:30"
+    $(".book-tickets time[datetime]").each((_, el) => {
+      const $time = $(el);
+      const datetimeAttr = $time.attr("datetime");
+
+      if (!datetimeAttr) return;
+
+      // Parse ISO datetime
+      const datetime = this.parseDateTime(datetimeAttr);
       if (!datetime) return;
 
-      // Build booking URL
-      let bookingUrl = href;
-      if (!bookingUrl.startsWith("http")) {
-        bookingUrl = `${this.config.baseUrl}${filmPath}`;
-      }
+      // Get booking URL from parent anchor
+      const $link = $time.closest("a");
+      const bookingUrl = $link.attr("href") || filmUrl;
 
-      // Check for special attributes
-      let format: string | undefined;
-      let eventType: string | undefined;
-      let eventDescription: string | undefined;
-
-      const parentText = $el.parent().text().toLowerCase();
-      if (parentText.includes("3d")) format = "3d";
-      if (parentText.includes("subtitled") || parentText.includes("hoh")) {
-        eventType = "subtitled";
-        eventDescription = "Subtitled for Hard of Hearing";
-      }
-      if (parentText.includes("baby") || parentText.includes("watch with baby")) {
-        eventType = "special_event";
-        eventDescription = "Watch With Baby";
-      }
-      if (parentText.includes("autism friendly")) {
-        eventType = "special_event";
-        eventDescription = "Autism Friendly";
-      }
-
-      const sourceId = `peckhamplex-${filmTitle.toLowerCase().replace(/\s+/g, "-")}-${datetime.toISOString()}`;
+      // Generate unique source ID
+      const sourceId = `peckhamplex-${filmTitle
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")}-${datetime.toISOString()}`;
 
       screenings.push({
         filmTitle,
         datetime,
-        format,
+        format: format || undefined,
         bookingUrl,
-        eventType,
-        eventDescription,
         sourceId,
       });
     });
 
-    // Alternative: look for date/time patterns in the page content
-    if (screenings.length === 0) {
-      const pageScreenings = this.extractScreeningsFromContent($, filmTitle, filmPath);
-      screenings.push(...pageScreenings);
-    }
-
     if (screenings.length > 0) {
       console.log(`[peckhamplex] ${filmTitle}: ${screenings.length} screenings`);
+    } else {
+      console.log(`[peckhamplex] ${filmTitle}: no screenings found`);
     }
 
     return screenings;
   }
 
   private extractFilmTitle($: cheerio.CheerioAPI): string | null {
+    // Try specific selectors first
     const selectors = [
-      "h1.film-title",
-      "h1.title",
-      ".film-header h1",
-      "article h1",
-      ".content h1",
-      "h1",
+      'h1.page-title[itemprop="name"]',
+      "h1.page-title",
+      'h1[itemprop="name"]',
+      ".film-details h1",
+      "main h1:not(:contains('Peckhamplex'))",
     ];
 
     for (const selector of selectors) {
       const title = $(selector).first().text().trim();
-      if (title && title.length > 2 && title.length < 200) {
+      if (title && title !== "Peckhamplex" && title.length > 1 && title.length < 200) {
+        // Remove year suffix if present (e.g., "Film Title (2024)")
         return title.replace(/\s*\(\d{4}\)\s*$/, "").trim();
       }
     }
 
-    return null;
+    // Fallback: find first h1 that isn't the site name
+    let fallbackTitle: string | null = null;
+    $("h1").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && text !== "Peckhamplex" && text.length > 1 && text.length < 200) {
+        fallbackTitle = text.replace(/\s*\(\d{4}\)\s*$/, "").trim();
+        return false; // break
+      }
+    });
+
+    return fallbackTitle;
   }
 
-  private extractDateTime(
-    $: cheerio.CheerioAPI,
-    $el: cheerio.Cheerio<cheerio.Element>,
-    text: string
-  ): Date | null {
-    // Try to find date and time from element and context
+  private extractFormat($: cheerio.CheerioAPI): string | null {
+    // Look for format in the film metadata section
+    const formatText = $(".film-details").text().toLowerCase();
 
-    // Pattern 1: "20 Dec 14:30" or "20 December 2:30pm"
-    const combinedMatch = text.match(
-      /(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{1,2}):(\d{2})\s*(am|pm)?/i
-    );
-    if (combinedMatch) {
-      return this.parseDateTime(combinedMatch[1], combinedMatch[2], combinedMatch[3], combinedMatch[4], combinedMatch[5]);
+    // Also check the page content
+    const pageText = $("main").text().toLowerCase();
+
+    if (formatText.includes("3d") || pageText.includes("3d digital")) {
+      return "3D";
     }
-
-    // Pattern 2: Just time, look for date in parent
-    const timeMatch = text.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
-    if (timeMatch) {
-      // Find date context
-      let dateStr: string | null = null;
-      let $current = $el.parent();
-
-      for (let i = 0; i < 5; i++) {
-        const parentText = $current.text();
-        const dateMatch = parentText.match(
-          /(\d{1,2})\s*(January|February|March|April|May|June|July|August|September|October|November|December)/i
-        );
-        if (dateMatch) {
-          dateStr = dateMatch[0];
-          break;
-        }
-        $current = $current.parent();
-        if ($current.length === 0) break;
-      }
-
-      if (dateStr) {
-        const dm = dateStr.match(/(\d{1,2})\s*(\w+)/);
-        if (dm) {
-          return this.parseDateTime(dm[1], dm[2], timeMatch[1], timeMatch[2], timeMatch[3]);
-        }
-      }
+    if (formatText.includes("imax")) {
+      return "IMAX";
     }
 
     return null;
   }
 
-  private extractScreeningsFromContent(
-    $: cheerio.CheerioAPI,
-    filmTitle: string,
-    filmPath: string
-  ): RawScreening[] {
-    const screenings: RawScreening[] = [];
-    const bodyText = $("body").text();
-
-    // Look for date + time patterns in the content
-    const pattern = /(\d{1,2})\s*(January|February|March|April|May|June|July|August|September|October|November|December)[,\s]+(\d{4})?\s*[-–@]?\s*(\d{1,2}):(\d{2})\s*(am|pm)?/gi;
-
-    let match;
-    while ((match = pattern.exec(bodyText)) !== null) {
-      const datetime = this.parseDateTime(match[1], match[2], match[4], match[5], match[6]);
-      if (datetime && datetime > new Date()) {
-        const sourceId = `peckhamplex-${filmTitle.toLowerCase().replace(/\s+/g, "-")}-${datetime.toISOString()}`;
-
-        screenings.push({
-          filmTitle,
-          datetime,
-          bookingUrl: `${this.config.baseUrl}${filmPath}`,
-          sourceId,
-        });
-      }
-    }
-
-    return screenings;
-  }
-
-  private parseDateTime(
-    day: string,
-    month: string,
-    hours: string,
-    minutes: string,
-    ampm?: string
-  ): Date | null {
+  private parseDateTime(datetimeAttr: string): Date | null {
     try {
-      const months: Record<string, number> = {
-        jan: 0, january: 0,
-        feb: 1, february: 1,
-        mar: 2, march: 2,
-        apr: 3, april: 3,
-        may: 4,
-        jun: 5, june: 5,
-        jul: 6, july: 6,
-        aug: 7, august: 7,
-        sep: 8, september: 8,
-        oct: 9, october: 9,
-        nov: 10, november: 10,
-        dec: 11, december: 11,
-      };
+      // datetime attribute format: "2026-01-04T17:30"
+      // This is local time, not UTC
+      const [datePart, timePart] = datetimeAttr.split("T");
+      if (!datePart || !timePart) return null;
 
-      const monthNum = months[month.toLowerCase()];
-      if (monthNum === undefined) return null;
+      const [year, month, day] = datePart.split("-").map(Number);
+      const [hours, minutes] = timePart.split(":").map(Number);
 
-      let h = parseInt(hours);
-      const m = parseInt(minutes);
-      const d = parseInt(day);
+      if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes)) {
+        return null;
+      }
 
-      if (ampm?.toLowerCase() === "pm" && h < 12) h += 12;
-      if (ampm?.toLowerCase() === "am" && h === 12) h = 0;
+      // Create date in local time
+      const date = new Date(year, month - 1, day, hours, minutes);
 
-      const year = new Date().getFullYear();
-      const date = new Date(year, monthNum, d, h, m);
-
-      // If date is in past, assume next year
-      if (date < new Date()) {
-        date.setFullYear(year + 1);
+      // Validate the date
+      if (isNaN(date.getTime())) {
+        return null;
       }
 
       return date;
@@ -340,10 +249,24 @@ export class PeckhamplexScraper implements CinemaScraper {
     const seen = new Set<string>();
 
     return screenings.filter((s) => {
+      // Must have title
       if (!s.filmTitle || s.filmTitle.trim() === "") return false;
+
+      // Must have valid datetime
       if (!s.datetime || isNaN(s.datetime.getTime())) return false;
+
+      // Must be in the future
       if (s.datetime < now) return false;
 
+      // Check for suspicious times (before 10am is likely a parsing error)
+      const hours = s.datetime.getHours();
+      if (hours < 10) {
+        console.warn(
+          `[peckhamplex] Warning: suspicious time ${hours}:${s.datetime.getMinutes()} for ${s.filmTitle}`
+        );
+      }
+
+      // Deduplicate
       if (s.sourceId && seen.has(s.sourceId)) return false;
       if (s.sourceId) seen.add(s.sourceId);
 

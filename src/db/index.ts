@@ -3,7 +3,7 @@ import postgres from "postgres";
 import * as schema from "./schema";
 
 /**
- * Database connection for Postboxd
+ * Database connection for Pictures
  *
  * Uses postgres.js driver with Drizzle ORM.
  * Connection string comes from environment variable.

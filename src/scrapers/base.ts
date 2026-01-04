@@ -124,7 +124,7 @@ export abstract class BaseScraper implements CinemaScraper {
       const response = await fetch(this.config.baseUrl, {
         method: "HEAD",
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; PostboxdBot/1.0)",
+          "User-Agent": "Mozilla/5.0 (compatible; PicturesBot/1.0)",
         },
       });
       return response.ok;

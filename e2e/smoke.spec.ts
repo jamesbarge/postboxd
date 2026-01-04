@@ -10,7 +10,7 @@ test.describe("Smoke Tests", () => {
     await page.goto("/");
 
     // Page should have a title
-    await expect(page).toHaveTitle(/postboxd/i);
+    await expect(page).toHaveTitle(/pictures/i);
 
     // Main content should be visible
     await expect(page.locator("main")).toBeVisible();

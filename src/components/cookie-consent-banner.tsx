@@ -51,7 +51,7 @@ export function CookieConsentBanner() {
             id="cookie-consent-description"
             className="text-sm text-text-secondary mb-4 leading-relaxed"
           >
-            We use cookies to understand how you use Postboxd and improve your
+            We use cookies to understand how you use Pictures and improve your
             experience. This includes analytics to see which features are
             popular and session recordings to fix issues.{" "}
             <Link
@@ -160,7 +160,7 @@ export function CookieConsentSettings() {
 
       {/* Info text */}
       <p className="text-xs text-text-tertiary">
-        Analytics help us understand how you use Postboxd. We use PostHog for
+        Analytics help us understand how you use Pictures. We use PostHog for
         privacy-focused analytics. Session recordings are masked to protect
         sensitive information.
       </p>

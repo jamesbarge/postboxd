@@ -180,6 +180,6 @@ export default async function FestivalsPage() {
 }
 
 export const metadata = {
-  title: "Film Festivals | Postboxd",
+  title: "Film Festivals | Pictures",
   description: "London film festivals - BFI LFF, Raindance, FrightFest, LSFF and more",
 };

@@ -220,7 +220,7 @@ export async function generateMetadata({ params }: FestivalPageProps) {
 
   const festival = result[0];
   return {
-    title: `${festival.name} | Postboxd`,
+    title: `${festival.name} | Pictures`,
     description:
       festival.description ||
       `${festival.name} - London film festival information and programme`,

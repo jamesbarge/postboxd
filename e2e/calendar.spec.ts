@@ -30,7 +30,7 @@ test.describe("Calendar Page", () => {
       await expect(page.locator("header")).toBeVisible();
 
       // Logo text should be visible
-      await expect(page.getByText("Postboxd")).toBeVisible();
+      await expect(page.getByText("Pictures")).toBeVisible();
     });
 
     test("should display main content area", async ({ page }) => {

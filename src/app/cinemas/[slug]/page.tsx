@@ -336,7 +336,7 @@ export async function generateMetadata({
   params,
 }: CinemaPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const BASE_URL = "https://postboxd.co.uk";
+  const BASE_URL = "https://pictures.london";
 
   const cinema = await db
     .select()

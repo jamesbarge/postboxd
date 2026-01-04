@@ -1,6 +1,6 @@
 /**
  * About Page
- * Describes Postboxd and lists covered cinemas
+ * Describes Pictures and lists covered cinemas
  * Important for E-E-A-T signals and AI citations
  */
 

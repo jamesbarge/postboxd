@@ -136,15 +136,15 @@ export default async function Home() {
   const faqItems = [
     {
       question: "What cinemas are in London?",
-      answer: `Postboxd tracks ${stats.cinemaCount} cinemas across London, including BFI Southbank, Prince Charles Cinema, Curzon, Picturehouse, ICA, Barbican, Odeon, and more. These venues show everything from blockbusters to art house, repertory, and independent films.`,
+      answer: `Pictures tracks ${stats.cinemaCount} cinemas across London, including BFI Southbank, Prince Charles Cinema, Curzon, Picturehouse, ICA, Barbican, Odeon, and more. These venues show everything from blockbusters to art house, repertory, and independent films.`,
     },
     {
       question: "How do I find film screenings in London?",
-      answer: `Postboxd aggregates listings from ${stats.cinemaCount} London cinemas into one calendar. Currently showing ${stats.uniqueFilms} films with ${stats.totalScreenings} upcoming screenings. Filter by cinema, date, format, or use the map to find screenings near you.`,
+      answer: `Pictures aggregates listings from ${stats.cinemaCount} London cinemas into one calendar. Currently showing ${stats.uniqueFilms} films with ${stats.totalScreenings} upcoming screenings. Filter by cinema, date, format, or use the map to find screenings near you.`,
     },
     {
       question: "What films are showing in London today?",
-      answer: `Postboxd shows ${stats.uniqueFilms} unique films currently screening at London cinemas. Check the calendar above for today's listings, filtered by your preferred cinemas.`,
+      answer: `Pictures shows ${stats.uniqueFilms} unique films currently screening at London cinemas. Check the calendar above for today's listings, filtered by your preferred cinemas.`,
     },
   ];
 

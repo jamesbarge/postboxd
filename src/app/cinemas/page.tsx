@@ -1,6 +1,6 @@
 /**
  * Cinema Directory Page
- * Lists all London independent cinemas covered by Postboxd
+ * Lists all London independent cinemas covered by Pictures
  * Optimized for local SEO and GEO with ItemList schema
  */
 
@@ -18,7 +18,7 @@ import {
 
 export const dynamic = "force-dynamic"; // Avoid build timeout on DB connection
 
-const BASE_URL = "https://postboxd.co.uk";
+const BASE_URL = "https://pictures.london";
 
 export const metadata: Metadata = {
   title: "London Cinemas - Complete Directory",

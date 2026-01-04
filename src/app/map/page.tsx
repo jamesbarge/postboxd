@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import { MapPageClient } from "./map-page-client";
 
 export const metadata = {
-  title: "Cinema Map | Postboxd",
+  title: "Cinema Map | Pictures",
   description: "Define your cinema area on the map",
 };
 

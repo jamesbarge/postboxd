@@ -5,10 +5,10 @@
  * placeholder with a film reel icon and title. Uses a deterministic
  * color based on the title for visual variety.
  *
- * Design: Uses the Postboxd color palette (prussian blue, jasmine gold, teal, reds)
+ * Design: Uses the Pictures color palette (prussian blue, jasmine gold, teal, reds)
  */
 
-// Cinema-inspired color palette matching Postboxd design system
+// Cinema-inspired color palette matching Pictures design system
 const PLACEHOLDER_COLORS = [
   { bg: "#001427", accent: "#f4d58d" }, // Prussian blue + jasmine
   { bg: "#0a2235", accent: "#94b3a8" }, // Darker blue + teal

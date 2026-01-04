@@ -1,6 +1,6 @@
 /**
  * Terms of Service Page
- * Terms and conditions for using Postboxd
+ * Terms and conditions for using Pictures
  */
 
 import { Metadata } from "next";

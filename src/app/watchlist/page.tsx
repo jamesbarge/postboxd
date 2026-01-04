@@ -104,6 +104,6 @@ export default async function WatchlistPage() {
 }
 
 export const metadata = {
-  title: "Watchlist | Postboxd",
+  title: "Watchlist | Pictures",
   description: "Your cinema watchlist - films you want to see",
 };
