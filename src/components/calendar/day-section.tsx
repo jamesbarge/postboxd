@@ -18,6 +18,7 @@ interface FilmGroup {
     year?: number | null;
     directors: string[];
     posterUrl?: string | null;
+    isRepertory?: boolean;
   };
   screeningCount: number;
   cinemaCount: number;

@@ -30,6 +30,7 @@ interface FilmCardProps {
     year?: number | null;
     directors: string[];
     posterUrl?: string | null;
+    isRepertory?: boolean;
   };
   screeningCount: number;
   cinemaCount: number;
@@ -239,6 +240,15 @@ export const FilmCard = memo(function FilmCard({
         {/* Screening summary */}
         <p className="text-[10px] text-text-tertiary mt-auto pt-1">
           {screeningCount} {screeningLabel} at {cinemaDisplay}
+          {film.isRepertory && (
+            <>
+              {" "}
+              <span className="text-[10px] text-text-tertiary">•</span>{" "}
+              <span className="font-semibold text-accent-gold uppercase tracking-wide">
+                rep
+              </span>
+            </>
+          )}
         </p>
       </Link>
     </article>

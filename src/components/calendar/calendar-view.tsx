@@ -70,6 +70,7 @@ interface FilmGroup {
     directors: string[];
     posterUrl?: string | null;
     letterboxdRating?: number | null;
+    isRepertory?: boolean;
   };
   screeningCount: number;
   cinemaCount: number;
@@ -346,6 +347,7 @@ export function CalendarView({ screenings, cinemas }: CalendarViewProps) {
             directors: g.film.directors,
             posterUrl: g.film.posterUrl,
             letterboxdRating: g.film.letterboxdRating,
+            isRepertory: g.film.isRepertory,
           },
           screeningCount: g.screenings.length,
           cinemaCount,
