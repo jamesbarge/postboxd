@@ -1,0 +1,62 @@
+/**
+ * Scraper Health Agent API
+ * Runs health checks on all cinema scrapers
+ *
+ * POST /api/admin/agents/health
+ */
+
+import { auth } from "@clerk/nextjs/server";
+import { runHealthCheckAllCinemas } from "@/agents";
+
+export const maxDuration = 60;
+
+export async function POST() {
+  // Verify admin auth
+  const { userId } = await auth();
+  if (!userId) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const result = await runHealthCheckAllCinemas();
+
+    if (!result.success) {
+      return Response.json({
+        success: false,
+        summary: "Health check failed",
+        error: result.error,
+      });
+    }
+
+    const reports = result.data || [];
+    const healthy = reports.filter((r) => !r.anomalyDetected).length;
+    const anomalies = reports.filter((r) => r.anomalyDetected);
+    const blocked = reports.filter((r) => r.shouldBlockScrape).length;
+
+    const details: string[] = [];
+
+    // Add anomalies to details
+    for (const report of anomalies) {
+      const warnings = report.warnings.slice(0, 2).join("; ");
+      details.push(`${report.cinemaName}: ${warnings}`);
+    }
+
+    return Response.json({
+      success: true,
+      summary: `Checked ${reports.length} cinemas: ${healthy} healthy, ${anomalies.length} anomalies, ${blocked} should block`,
+      details: details.length > 0 ? details : undefined,
+      tokensUsed: result.tokensUsed,
+      executionTimeMs: result.executionTimeMs,
+    });
+  } catch (error) {
+    console.error("Scraper health error:", error);
+    return Response.json(
+      {
+        success: false,
+        summary: "Health check failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
+}

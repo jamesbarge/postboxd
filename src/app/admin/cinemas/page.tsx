@@ -6,10 +6,9 @@
 import { db } from "@/db";
 import { cinemas, screenings } from "@/db/schema";
 import { eq, gte, count, and } from "drizzle-orm";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Building2, Settings, AlertCircle } from "lucide-react";
-import { cn } from "@/lib/cn";
+import { Card, CardContent } from "@/components/ui/card";
+import { AlertCircle } from "lucide-react";
+import { CinemaCardWithConfig } from "./components/cinema-card-with-config";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +88,14 @@ export default async function AdminCinemasPage() {
         </h2>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {topTier.map(cinema => (
-            <CinemaCard key={cinema.id} cinema={cinema} tier="top" />
+            <CinemaCardWithConfig
+              key={cinema.id}
+              cinema={{
+                ...cinema,
+                lastScrapedAt: cinema.lastScrapedAt?.toISOString() ?? null,
+              }}
+              tier="top"
+            />
           ))}
         </div>
       </div>
@@ -104,80 +110,17 @@ export default async function AdminCinemasPage() {
         </h2>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {standardTier.map(cinema => (
-            <CinemaCard key={cinema.id} cinema={cinema} tier="standard" />
+            <CinemaCardWithConfig
+              key={cinema.id}
+              cinema={{
+                ...cinema,
+                lastScrapedAt: cinema.lastScrapedAt?.toISOString() ?? null,
+              }}
+              tier="standard"
+            />
           ))}
         </div>
       </div>
     </div>
-  );
-}
-
-function CinemaCard({
-  cinema,
-  tier,
-}: {
-  cinema: {
-    id: string;
-    name: string;
-    shortName: string | null;
-    chain: string | null;
-    website: string;
-    lastScrapedAt: Date | null;
-    dataSourceType: "scrape" | "api" | "manual" | null;
-    screeningCount: number;
-  };
-  tier: "top" | "standard";
-}) {
-  const lastScraped = cinema.lastScrapedAt
-    ? new Date(cinema.lastScrapedAt).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "Never";
-
-  return (
-    <Card className={cn(
-      tier === "top" && "border-l-4 border-l-accent-primary"
-    )}>
-      <div className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-text-primary truncate">
-              {cinema.shortName || cinema.name}
-            </h3>
-            <p className="text-xs text-text-tertiary mt-0.5">
-              {cinema.chain || "Independent"}
-            </p>
-          </div>
-          <Building2 className="w-5 h-5 text-text-tertiary shrink-0" />
-        </div>
-
-        <div className="mt-3 space-y-1 text-sm">
-          <div className="flex justify-between">
-            <span className="text-text-tertiary">Screenings</span>
-            <span className="font-mono text-text-primary">{cinema.screeningCount}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-text-tertiary">Last scraped</span>
-            <span className="text-text-secondary">{lastScraped}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-text-tertiary">Source</span>
-            <span className="text-text-secondary capitalize">
-              {cinema.dataSourceType || "Unknown"}
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-4 pt-3 border-t border-border-subtle flex gap-2">
-          <Button variant="ghost" size="sm" className="flex-1">
-            <Settings className="w-4 h-4 mr-1" />
-            Configure
-          </Button>
-        </div>
-      </div>
-    </Card>
   );
 }
