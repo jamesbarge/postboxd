@@ -169,7 +169,7 @@ export class PeckhamplexScraper implements CinemaScraper {
     return screenings;
   }
 
-  private extractFilmTitle($: cheerio.CheerioAPI): string | null {
+  private extractFilmTitle($: CheerioAPI): string | null {
     // Try specific selectors first
     const selectors = [
       'h1.page-title[itemprop="name"]',
@@ -200,7 +200,7 @@ export class PeckhamplexScraper implements CinemaScraper {
     return fallbackTitle;
   }
 
-  private extractFormat($: cheerio.CheerioAPI): string | null {
+  private extractFormat($: CheerioAPI): string | null {
     // Look for format in the film metadata section
     const formatText = $(".film-details").text().toLowerCase();
 
