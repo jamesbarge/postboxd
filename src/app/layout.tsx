@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, JetBrains_Mono, Cormorant } from "next/font/google";
+import localFont from "next/font/local";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -26,6 +27,23 @@ const cormorant = Cormorant({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   style: ["normal", "italic"],
+});
+
+const ttSlabs = localFont({
+  src: [
+    {
+      path: "../../public/fonts/tt-slabs-regular.otf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/tt-slabs-bold.otf",
+      weight: "700",
+      style: "normal",
+    },
+  ],
+  variable: "--font-tt-slabs",
+  display: "swap",
 });
 
 const BASE_URL = "https://pictures.london";
@@ -164,7 +182,7 @@ export default function RootLayout({
         <Script src="/theme-init.js" strategy="beforeInteractive" />
       </head>
       <body
-        className={`${dmSans.variable} ${jetbrainsMono.variable} ${cormorant.variable} antialiased bg-background-primary text-text-primary`}
+        className={`${dmSans.variable} ${jetbrainsMono.variable} ${cormorant.variable} ${ttSlabs.variable} antialiased bg-background-primary text-text-primary`}
       >
         {/* Organization schema for brand recognition */}
         <OrganizationSchema />
@@ -183,7 +201,8 @@ export default function RootLayout({
         >
           <Providers>
             <div className="min-h-screen flex flex-col">
-              <main className="flex-1">{children}</main>
+              {/* isolation: isolate fixes GPU compositing conflict with body::before/after paper grain overlays */}
+              <main className="flex-1" style={{ isolation: "isolate", position: "relative", zIndex: 1 }}>{children}</main>
               <Footer />
             </div>
           </Providers>
