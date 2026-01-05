@@ -60,7 +60,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
   // Basic metadata
   title: {
-    default: "Pictures - London Cinema Calendar",
+    default: "Pictures - London Cinema Listings | Showtimes | Festivals",
     template: "%s | Pictures",
   },
   description:
@@ -74,7 +74,7 @@ export async function generateMetadata(): Promise<Metadata> {
     "art house cinema",
     "repertory cinema",
     "London film",
-    "cinema calendar",
+    "cinema listings",
     "movie showtimes",
   ],
 
@@ -90,7 +90,7 @@ export async function generateMetadata(): Promise<Metadata> {
     locale: "en_GB",
     url: BASE_URL,
     siteName: "Pictures",
-    title: "Pictures - London Cinema Calendar",
+    title: "Pictures - London Cinema Listings | Showtimes | Festivals",
     description:
       "Find screenings at London cinemas. BFI, Prince Charles, Curzon, Picturehouse, ICA, Odeon, and more. Updated daily.",
     images: [
@@ -98,7 +98,7 @@ export async function generateMetadata(): Promise<Metadata> {
         url: `${BASE_URL}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: "Pictures - London Cinema Calendar",
+        alt: "Pictures - London Cinema Listings",
       },
     ],
   },
@@ -106,7 +106,7 @@ export async function generateMetadata(): Promise<Metadata> {
   // Twitter Card
   twitter: {
     card: "summary_large_image",
-    title: "Pictures - London Cinema Calendar",
+    title: "Pictures - London Cinema Listings | Showtimes | Festivals",
     description:
       "Find screenings at London cinemas. Updated daily with showtimes from 20+ venues.",
     images: [`${BASE_URL}/og-image.png`],

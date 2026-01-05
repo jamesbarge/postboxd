@@ -71,7 +71,7 @@ export function Header({ cinemas, festivals, availableFormats }: HeaderProps) {
             </span>
             <span className="text-text-muted/40 text-lg font-light">|</span>
             <span className="text-sm text-text-tertiary font-normal hidden sm:inline">
-              London Cinema Calendar
+              London Cinema Listings
             </span>
           </Link>
 

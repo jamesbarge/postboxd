@@ -1,7 +1,7 @@
 # CLAUDE.md - Project Rules for AI Assistants
 
 ## Project Overview
-London cinema calendar app that scrapes screening data from cinemas across London and displays them in a unified calendar view. We cover all cinemas with a special focus on independent venues.
+London cinema listings app that scrapes screening data from cinemas across London and displays them in a unified view. We cover all cinemas with a special focus on independent venues.
 
 **Production URL: https://pictures.london**
 

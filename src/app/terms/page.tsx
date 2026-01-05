@@ -14,13 +14,13 @@ const LAST_UPDATED = "31 December 2024";
 export const metadata: Metadata = {
   title: "Terms of Service - Pictures",
   description:
-    "Terms of service for Pictures, the London cinema calendar. Read our terms and conditions.",
+    "Terms of service for Pictures, London cinema listings. Read our terms and conditions.",
   alternates: {
     canonical: "/terms",
   },
   openGraph: {
     title: "Terms of Service - Pictures",
-    description: "Terms of service for Pictures, the London cinema calendar.",
+    description: "Terms of service for Pictures, London cinema listings.",
     url: `${BASE_URL}/terms`,
     type: "website",
   },

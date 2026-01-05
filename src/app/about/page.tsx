@@ -17,16 +17,16 @@ export const revalidate = 3600; // Revalidate hourly
 const BASE_URL = "https://pictures.london";
 
 export const metadata: Metadata = {
-  title: "About Pictures - London Cinema Calendar",
+  title: "About Pictures - London Cinema Listings",
   description:
-    "Pictures aggregates film listings from 20+ independent London cinemas into one calendar. Find screenings at BFI, Prince Charles, Curzon, Picturehouse, and more.",
+    "Pictures aggregates film listings from 20+ independent London cinemas into one view. Find screenings at BFI, Prince Charles, Curzon, Picturehouse, and more.",
   alternates: {
     canonical: "/about",
   },
   openGraph: {
-    title: "About Pictures - London Cinema Calendar",
+    title: "About Pictures - London Cinema Listings",
     description:
-      "The definitive cinema calendar for London cinephiles. Updated daily with listings from independent venues.",
+      "The definitive cinema listings for London cinephiles. Updated daily with listings from independent venues.",
     url: `${BASE_URL}/about`,
     type: "website",
   },
@@ -123,7 +123,7 @@ export default async function AboutPage() {
 
         {/* Answer-first summary */}
         <p className="text-lg text-text-secondary mb-8">
-          Pictures is the definitive cinema calendar for London cinephiles. We
+          Pictures provides the definitive cinema listings for London cinephiles. We
           aggregate listings from {stats.cinemaCount} cinemas into
           one unified view, helping you discover screenings you might otherwise
           miss.
