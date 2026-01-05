@@ -201,8 +201,7 @@ export default function RootLayout({
         >
           <Providers>
             <div className="min-h-screen flex flex-col">
-              {/* isolation: isolate fixes GPU compositing conflict with body::before/after paper grain overlays */}
-              <main className="flex-1" style={{ isolation: "isolate", position: "relative", zIndex: 1 }}>{children}</main>
+              <main className="flex-1">{children}</main>
               <Footer />
             </div>
           </Providers>
