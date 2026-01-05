@@ -25,6 +25,42 @@ function isAdminEmail(email: string | undefined | null): boolean {
 }
 
 /**
+ * Determine if tracking should be enabled based on consent and admin status.
+ * Returns: "enable" | "disable" | "wait"
+ * - "enable": User consented and is not an admin
+ * - "disable": User rejected consent OR is an admin
+ * - "wait": Still loading user data (don't change state yet)
+ */
+function useTrackingDecision(): "enable" | "disable" | "wait" {
+  const analyticsConsent = useCookieConsent((state) => state.analyticsConsent);
+  const { user, isLoaded: isUserLoaded } = useUser();
+
+  // If consent is pending, wait
+  if (analyticsConsent === "pending") {
+    return "wait";
+  }
+
+  // If consent was rejected, disable immediately (no need to wait for user)
+  if (analyticsConsent === "rejected") {
+    return "disable";
+  }
+
+  // Consent was accepted - now we need to check admin status
+  // If user auth is still loading, wait before enabling
+  if (!isUserLoaded) {
+    return "wait";
+  }
+
+  // User is loaded - check if they're an admin
+  if (user && isAdminEmail(user.primaryEmailAddress?.emailAddress)) {
+    return "disable";
+  }
+
+  // Not an admin (or not signed in) with consent - enable tracking
+  return "enable";
+}
+
+/**
  * Initialize PostHog with privacy-first defaults.
  * Tracking is disabled by default and only enabled after explicit consent.
  */
@@ -81,23 +117,29 @@ if (typeof window !== "undefined") {
 
 /**
  * Component to manage consent state and update PostHog accordingly.
- * IMPORTANT: set_config alone doesn't start session recording - we need startSessionRecording()
+ * IMPORTANT: This component now also checks admin status BEFORE starting recording
+ * to prevent the race condition where recording starts before we know it's an admin.
  */
 function PostHogConsentManager() {
   const posthogClient = usePostHog();
-  const analyticsConsent = useCookieConsent((state) => state.analyticsConsent);
-  const lastAppliedConsent = useRef<string | null>(null);
+  const trackingDecision = useTrackingDecision();
+  const lastAppliedDecision = useRef<"enable" | "disable" | null>(null);
 
   useEffect(() => {
     if (!posthogClient) return;
 
-    // Skip if we've already processed this consent state
-    if (lastAppliedConsent.current === analyticsConsent) return;
+    // Wait until we have enough information to make a decision
+    if (trackingDecision === "wait") {
+      return;
+    }
 
-    if (analyticsConsent === "accepted") {
-      // User accepted - enable tracking with persistent storage
+    // Skip if we've already applied this decision
+    if (lastAppliedDecision.current === trackingDecision) return;
+
+    if (trackingDecision === "enable") {
+      // User consented AND is not an admin - enable tracking
       if (process.env.NODE_ENV === "development") {
-        console.log("[PostHog] Consent accepted - enabling tracking and session recording");
+        console.log("[PostHog] Enabling tracking and session recording (consent given, not admin)");
       }
 
       posthogClient.opt_in_capturing();
@@ -107,120 +149,107 @@ function PostHogConsentManager() {
         persistence: "localStorage+cookie",
       });
 
-      // CRITICAL: Actually start session recording
-      // set_config({ disable_session_recording: false }) doesn't start it!
+      // Start session recording only after confirming not an admin
       posthogClient.startSessionRecording();
 
-      lastAppliedConsent.current = "accepted";
+      lastAppliedDecision.current = "enable";
 
       if (process.env.NODE_ENV === "development") {
-        console.log("[PostHog] Session recording started, capturing opted in");
+        console.log("[PostHog] Session recording started");
       }
-    } else if (analyticsConsent === "rejected") {
-      // User rejected - ensure tracking is disabled
+    } else if (trackingDecision === "disable") {
+      // User rejected consent OR is an admin - disable tracking
       if (process.env.NODE_ENV === "development") {
-        console.log("[PostHog] Consent rejected - disabling all tracking");
+        console.log("[PostHog] Disabling all tracking (consent rejected or admin user)");
       }
 
       posthogClient.opt_out_capturing();
       posthogClient.stopSessionRecording();
+      posthogClient.reset(); // Clear any existing identity for admins
 
-      lastAppliedConsent.current = "rejected";
-    } else if (analyticsConsent === "pending") {
-      // Reset state tracking for fresh consent
-      lastAppliedConsent.current = null;
+      lastAppliedDecision.current = "disable";
     }
-  }, [posthogClient, analyticsConsent]);
+  }, [posthogClient, trackingDecision]);
 
   return null;
 }
 
 /**
  * Component to track pageviews with App Router.
- * Respects both cookie consent and admin exclusion.
+ * Uses centralized tracking decision that considers both consent and admin status.
  */
 function PostHogPageView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const posthogClient = usePostHog();
-  const canTrack = useCookieConsent((state) => state.canTrack());
-  const { user, isLoaded } = useUser();
+  const trackingDecision = useTrackingDecision();
 
   useEffect(() => {
-    // Don't track if no consent, PostHog not ready, or user is admin
-    if (!pathname || !posthogClient || !canTrack) return;
-    if (isLoaded && user && isAdminEmail(user.primaryEmailAddress?.emailAddress)) {
-      return; // Skip pageview tracking for admins
-    }
+    // Only track if tracking is enabled (consent given AND not admin)
+    if (!pathname || !posthogClient || trackingDecision !== "enable") return;
 
     let url = window.origin + pathname;
     if (searchParams.toString()) {
       url = url + "?" + searchParams.toString();
     }
     posthogClient.capture("$pageview", { $current_url: url });
-  }, [pathname, searchParams, posthogClient, canTrack, user, isLoaded]);
+  }, [pathname, searchParams, posthogClient, trackingDecision]);
 
   return null;
 }
 
 /**
  * Component to identify users with Clerk.
- * Admin users are completely excluded from all tracking.
+ * Admin exclusion is now handled by PostHogConsentManager via useTrackingDecision.
  */
 function PostHogUserIdentify() {
   const { user, isLoaded } = useUser();
   const posthogClient = usePostHog();
-  const canTrack = useCookieConsent((state) => state.canTrack());
-  const isAdminOptedOut = useRef(false);
+  const trackingDecision = useTrackingDecision();
+  const lastIdentifiedUserId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !posthogClient) return;
 
+    // Only identify users if tracking is enabled (not admin, has consent)
+    if (trackingDecision !== "enable") {
+      // If tracking was disabled and we had identified a user, reset
+      if (lastIdentifiedUserId.current !== null) {
+        posthogClient.reset();
+        lastIdentifiedUserId.current = null;
+      }
+      return;
+    }
+
     if (user) {
+      // Skip if already identified this user
+      if (lastIdentifiedUserId.current === user.id) return;
+
       const userEmail = user.primaryEmailAddress?.emailAddress;
 
-      // Check if this is an admin user who should be excluded
-      if (isAdminEmail(userEmail)) {
-        if (!isAdminOptedOut.current) {
-          if (process.env.NODE_ENV === "development") {
-            console.log("[PostHog] Admin user detected - opting out of all tracking");
-          }
+      posthogClient.identify(user.id, {
+        email: userEmail,
+        name: user.fullName,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        imageUrl: user.imageUrl,
+        createdAt: user.createdAt,
+      });
 
-          // Completely disable tracking for admin users
-          posthogClient.opt_out_capturing();
-          posthogClient.stopSessionRecording();
-          posthogClient.reset(); // Clear any existing identity
+      lastIdentifiedUserId.current = user.id;
 
-          isAdminOptedOut.current = true;
-        }
-        return; // Don't identify admin users
-      }
-
-      // Reset admin flag if user changed
-      isAdminOptedOut.current = false;
-
-      // Only identify non-admin users who have consented
-      if (canTrack) {
-        posthogClient.identify(user.id, {
-          email: userEmail,
-          name: user.fullName,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          username: user.username,
-          imageUrl: user.imageUrl,
-          createdAt: user.createdAt,
-        });
-
-        if (process.env.NODE_ENV === "development") {
-          console.log("[PostHog] User identified:", user.id);
-        }
+      if (process.env.NODE_ENV === "development") {
+        console.log("[PostHog] User identified:", user.id);
       }
     } else {
       // User signed out - reset PostHog identity
-      isAdminOptedOut.current = false;
-      posthogClient.reset();
+      if (lastIdentifiedUserId.current !== null) {
+        posthogClient.reset();
+        lastIdentifiedUserId.current = null;
+      }
     }
-  }, [user, isLoaded, posthogClient, canTrack]);
+  }, [user, isLoaded, posthogClient, trackingDecision]);
 
   return null;
 }
