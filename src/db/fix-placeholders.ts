@@ -49,7 +49,7 @@ async function fixPlaceholderFilms() {
     if (result.cleanTitle !== film.title || film.tmdbId === null) {
       try {
         const match = await matchFilmToTMDB(result.cleanTitle, {
-          year: result.year,
+          year: result.year ?? undefined,
           skipAmbiguityCheck: true,
         });
 
