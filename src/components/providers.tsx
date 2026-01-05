@@ -14,6 +14,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
     runAllStorageMigrations();
   }, []);
 
+  // Force repaint after hydration to fix image compositing issues
+  // Images load but don't paint until a repaint is triggered
+  useEffect(() => {
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      document.body.style.transform = 'translateZ(0)';
+      requestAnimationFrame(() => {
+        document.body.style.transform = '';
+      });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [queryClient] = useState(
     () =>
       new QueryClient({
