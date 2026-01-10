@@ -8,26 +8,30 @@ Fix broken cinema scrapers and run all high-priority scrapers to populate screen
 
 Ensure users can see complete cinema listings for all London venues through end of February.
 
+## Current State (v1.0 Shipped)
+
+- **Total future screenings**: 5,981
+- **Date coverage**: Through April 6, 2026
+- **All scrapers operational**: Genesis, Lexi, Phoenix, Castle Sidcup fixed
+
 ## Requirements
 
 ### Validated
 
-- Scraper infrastructure exists (BaseScraper, pipeline, utilities)
-- Database schema supports screening storage
-- 54 cinemas currently have some data
+- Fix Genesis Cinema scraper (no data) — v1.0
+- Fix The Lexi Cinema scraper (no data) — v1.0
+- Fix Phoenix Cinema scraper (no data) — v1.0
+- Fix Castle Cinema Sidcup scraper (no data) — v1.0
+- Run Curzon scraper (10 venues) — v1.0
+- Run Everyman scraper (14 venues) — v1.0
+- Run BFI scraper (2 venues) — v1.0
+- Run Barbican scraper — v1.0
+- Run Electric scraper — v1.0
+- Run Picturehouse scraper (11 venues) — v1.0
 
 ### Active
 
-- [ ] Fix Genesis Cinema scraper (no data)
-- [ ] Fix The Lexi Cinema scraper (no data)
-- [ ] Fix Phoenix Cinema scraper (no data)
-- [ ] Fix Castle Cinema Sidcup scraper (no data)
-- [ ] Run Curzon scraper (10 venues, data ends mid-Jan)
-- [ ] Run Everyman scraper (15 venues, data ends mid-Jan)
-- [ ] Run BFI scraper (data ends mid-Jan)
-- [ ] Run Barbican scraper (data ends Jan 17)
-- [ ] Run Electric scraper (data ends Jan 15)
-- [ ] Run all remaining scrapers for February data
+(None - milestone complete)
 
 ### Out of Scope
 
@@ -39,8 +43,10 @@ Ensure users can see complete cinema listings for all London venues through end 
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Fix broken scrapers first | No point running a scraper that doesn't work | Pending |
-| Prioritize high-traffic venues | Curzon/Everyman/BFI are most popular | Pending |
+| Fix broken scrapers first | No point running a scraper that doesn't work | Good - found DB schema issue |
+| Prioritize high-traffic venues | Curzon/Everyman/BFI are most popular | Good - major venues now have data |
+| Use bracket-matching for Lexi JSON | Non-greedy regex was failing | Good - 103 screenings extracted |
+| Parse panel IDs for Genesis dates | Text-based date extraction unreliable | Good - 104 screenings extracted |
 
 ## Technical Context
 
@@ -49,23 +55,22 @@ Ensure users can see complete cinema listings for all London venues through end 
 - **Cheerio/Fetch**: Most independents (static HTML)
 - **API-based**: Picturehouse, Electric (fastest)
 
-### Known Issues from Playbook
-- Genesis: Multi-page HTML scraper, may have selector changes
-- Lexi: Simple HTML scraper, likely selector drift
-- Phoenix: Unknown - needs investigation
-- Castle Sidcup: Unknown - needs investigation
+### Fixes Applied
+- Database: Added `manually_edited` and `edited_at` columns
+- Genesis: Extract dates from panel IDs (`panel_20260113` → date)
+- Lexi: Bracket-matching JSON extraction
 
-### Database State (as of diagnostic)
-- Total future screenings: 2,872
-- Cinemas with no data: 4
-- Cinemas with data ending mid-Jan: ~20
+### Database State (after v1.0)
+- Total future screenings: 5,981
+- Previously broken cinemas: 4 (all fixed)
+- Date coverage: Through April 6, 2026
 
 ## Success Criteria
 
-- [ ] All 4 broken scrapers fixed and producing data
-- [ ] All high-priority scrapers run successfully
-- [ ] Screening data available through Feb 28, 2026
-- [ ] No regressions in working scrapers
+- [x] All 4 broken scrapers fixed and producing data
+- [x] All high-priority scrapers run successfully
+- [x] Screening data available through Feb 28, 2026
+- [x] No regressions in working scrapers
 
 ---
-*Last updated: 2026-01-10 after initialization*
+*Last updated: 2026-01-10 after v1.0 milestone*
