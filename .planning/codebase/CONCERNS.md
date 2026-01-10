@@ -9,55 +9,65 @@ Overall quality: **Good** - Well-structured codebase with proper error handling,
 **Test Coverage:** Good (16+ test files covering critical paths)
 **Dependencies:** Current (Next.js 16.1.0, React 19.2.3, Drizzle ORM 0.45.1)
 
-## High Priority
+## High Priority (All Resolved)
 
-### 1. Missing Input Validation in Admin APIs
+### 1. ~~Missing Input Validation in Admin APIs~~ (RESOLVED)
 
-**Severity:** High
+**Severity:** ~~High~~ → Resolved
 **Files:**
 - `src/app/api/admin/screenings/[id]/route.ts`
 - `src/app/api/admin/cinemas/[id]/config/route.ts`
 
-**Issue:**
-Request body parsing uses `await request.json()` without Zod validation. Malformed JSON or missing fields could cause runtime errors. While `/api/screenings` uses Zod validation, admin routes lack this protection.
+**Original Issue:**
+Request body parsing uses `await request.json()` without Zod validation. Malformed JSON or missing fields could cause runtime errors.
 
-**Risk:** Invalid request bodies could crash the API endpoint or cause type errors.
-
-**Fix:** Add Zod schema validation on all request bodies before processing, matching the pattern in `/api/screenings`.
+**Resolution (2026-01-10):**
+Added Zod schemas to both admin routes:
+- `updateScreeningSchema` and `patchScreeningSchema` for screenings route
+- `cinemaConfigSchema` for cinema config route
+All routes now use safeParse pattern with proper error responses.
 
 ---
 
-### 2. No Rate Limiting on Public API Routes
+### 2. ~~No Rate Limiting on Public API Routes~~ (RESOLVED)
 
-**Severity:** High
+**Severity:** ~~High~~ → Resolved
 **Files:**
 - `src/app/api/screenings/route.ts`
 - `src/app/api/search/route.ts`
-- `src/app/api/films/search/route.ts`
+- `src/app/api/films/search/route.ts` (already had rate limiting)
 
-**Issue:**
-Public API endpoints lack rate limiting. A rate-limit utility exists in `src/lib/rate-limit.ts` but isn't applied to the main API routes.
+**Original Issue:**
+Public API endpoints lack rate limiting.
 
-**Risk:** Subject to scraping or DoS attacks. The screenings endpoint can return up to 3000 results with no limit on request frequency.
-
-**Fix:** Apply rate limiting middleware to public API routes.
+**Resolution (2026-01-10):**
+Applied rate limiting to all public endpoints:
+- `/api/screenings` - 100 req/min (RATE_LIMITS.public)
+- `/api/search` - 30 req/min (RATE_LIMITS.search)
+- `/api/films/search` - already had rate limiting
+All routes return 429 with Retry-After header when limits exceeded.
 
 ---
 
-### 3. Error Handling Gap in JSON Parsing
+### 3. ~~Error Handling Gap in JSON Parsing~~ (RESOLVED)
 
-**Severity:** High
+**Severity:** ~~High~~ → Resolved
 **File:** `src/lib/title-extractor.ts` (lines 64-73)
 
-**Issue:**
+**Original Issue:**
 ```typescript
 const text = response.content[0].type === "text" ? response.content[0].text : "";
-const parsed = JSON.parse(text.trim());  // No try-catch around JSON.parse
+const parsed = JSON.parse(text.trim());  // Flagged as having no try-catch
 ```
 
-If Claude returns invalid JSON, the JSON.parse throws an uncaught error instead of falling back to the low-confidence path.
+**Resolution (2026-01-10):**
+Upon code review, the `JSON.parse` call IS already wrapped in a try-catch block (lines 41-81). The concern analysis was a **false positive**. The catch block at line 74 properly falls back to low-confidence extraction when JSON parsing fails.
 
-**Fix:** Wrap JSON.parse in try-catch and handle parse errors gracefully.
+**Verification:** Added test cases `title-extractor.test.ts`:
+- "should handle invalid JSON response gracefully"
+- "should handle malformed JSON response gracefully"
+
+Both tests confirm errors are caught and handled correctly.
 
 ---
 
@@ -192,10 +202,10 @@ The following areas are well-implemented:
 
 ## Action Items by Priority
 
-**High Priority:**
-1. Add Zod validation to all admin API request bodies
-2. Implement rate limiting on public API endpoints
-3. Fix JSON parsing error handling in title-extractor
+**High Priority:** (All resolved 2026-01-10)
+1. ~~Add Zod validation to all admin API request bodies~~ ✓
+2. ~~Implement rate limiting on public API endpoints~~ ✓
+3. ~~Fix JSON parsing error handling in title-extractor~~ ✓ (false positive - already handled)
 
 **Medium Priority:**
 1. Enable link_status columns in screenings table (migration workaround needed)
