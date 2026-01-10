@@ -14,3 +14,6 @@ export * from "./user-preferences";
 
 // Admin & data completeness schemas
 export * from "./admin";
+
+// Season schemas
+export * from "./seasons";
