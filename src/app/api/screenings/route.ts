@@ -11,6 +11,7 @@ import { startOfDay, endOfDay, addDays } from "date-fns";
 import { z } from "zod";
 import type { ScreeningFormat } from "@/types/screening";
 import { BadRequestError, handleApiError } from "@/lib/api-errors";
+import { checkRateLimit, getClientIP, RATE_LIMITS } from "@/lib/rate-limit";
 
 // Input validation schema
 const querySchema = z.object({
@@ -26,6 +27,19 @@ const querySchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
+    // Rate limit check
+    const ip = getClientIP(request);
+    const rateLimitResult = checkRateLimit(ip, { ...RATE_LIMITS.public, prefix: "screenings" });
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: "Too many requests", screenings: [] },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateLimitResult.resetIn) },
+        }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
 
     // Validate query parameters
