@@ -10,10 +10,24 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { cinemaBaselines, cinemas } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { BadRequestError, handleApiError } from "@/lib/api-errors";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
+
+// Zod schema for PUT - update cinema config
+const cinemaConfigSchema = z.object({
+  tier: z.enum(["top", "standard"]).optional(),
+  tolerancePercent: z.number().min(10).max(100).optional(),
+  weekdayAvg: z.number().nullable().optional(),
+  weekendAvg: z.number().nullable().optional(),
+  manualOverride: z.boolean().optional(),
+  notes: z.string().nullable().optional(),
+  scrapeHorizonDays: z.number().min(7).max(365).optional(),
+  maxScrapeDate: z.string().datetime().nullable().optional(),
+});
 
 // Default config for cinemas without baselines
 const DEFAULT_CONFIG = {
@@ -23,6 +37,8 @@ const DEFAULT_CONFIG = {
   weekendAvg: null,
   manualOverride: false,
   notes: null,
+  scrapeHorizonDays: 60,
+  maxScrapeDate: null,
 };
 
 export async function GET(request: Request, { params }: RouteParams) {
@@ -61,6 +77,8 @@ export async function GET(request: Request, { params }: RouteParams) {
         weekendAvg: baseline.weekendAvg,
         manualOverride: baseline.manualOverride,
         notes: baseline.notes,
+        scrapeHorizonDays: baseline.scrapeHorizonDays,
+        maxScrapeDate: baseline.maxScrapeDate,
       });
     }
 
@@ -76,33 +94,21 @@ export async function GET(request: Request, { params }: RouteParams) {
 }
 
 export async function PUT(request: Request, { params }: RouteParams) {
-  // Verify admin auth
-  const { userId } = await auth();
-  if (!userId) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { id: cinemaId } = await params;
-
   try {
-    const body = await request.json();
-    const { tier, tolerancePercent, weekdayAvg, weekendAvg, manualOverride, notes } = body;
-
-    // Validate tier
-    if (tier && !["top", "standard"].includes(tier)) {
-      return Response.json({ error: "Invalid tier" }, { status: 400 });
+    // Verify admin auth
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Validate tolerancePercent
-    if (tolerancePercent !== undefined) {
-      const tolerance = parseInt(tolerancePercent);
-      if (isNaN(tolerance) || tolerance < 10 || tolerance > 80) {
-        return Response.json(
-          { error: "Tolerance must be between 10 and 80" },
-          { status: 400 }
-        );
-      }
+    const { id: cinemaId } = await params;
+
+    // Validate request body with Zod
+    const parseResult = cinemaConfigSchema.safeParse(await request.json());
+    if (!parseResult.success) {
+      throw new BadRequestError("Invalid request body", parseResult.error.flatten());
     }
+    const body = parseResult.data;
 
     // Verify cinema exists
     const [cinema] = await db
@@ -123,12 +129,14 @@ export async function PUT(request: Request, { params }: RouteParams) {
       .limit(1);
 
     const configData = {
-      tier: tier || "standard",
-      tolerancePercent: tolerancePercent ?? 30,
-      weekdayAvg: weekdayAvg ?? null,
-      weekendAvg: weekendAvg ?? null,
-      manualOverride: manualOverride ?? false,
-      notes: notes ?? null,
+      tier: body.tier ?? "standard",
+      tolerancePercent: body.tolerancePercent ?? 30,
+      weekdayAvg: body.weekdayAvg ?? null,
+      weekendAvg: body.weekendAvg ?? null,
+      manualOverride: body.manualOverride ?? false,
+      notes: body.notes ?? null,
+      scrapeHorizonDays: body.scrapeHorizonDays ?? 60,
+      maxScrapeDate: body.maxScrapeDate ?? null,
       updatedAt: new Date(),
     };
 
@@ -151,10 +159,6 @@ export async function PUT(request: Request, { params }: RouteParams) {
       message: "Config saved",
     });
   } catch (error) {
-    console.error("Error saving cinema config:", error);
-    return Response.json(
-      { error: "Failed to save config" },
-      { status: 500 }
-    );
+    return handleApiError(error, "PUT /api/admin/cinemas/[id]/config");
   }
 }
