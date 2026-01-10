@@ -14,7 +14,7 @@ None
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: API Validation** - Add Zod schemas to admin API routes
+- [x] **Phase 1: API Validation** - Add Zod schemas to admin API routes
 - [ ] **Phase 2: Rate Limiting** - Apply rate limiting to public API endpoints
 - [ ] **Phase 3: JSON Error Handling** - Fix JSON parsing in title-extractor
 
@@ -57,6 +57,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Validation | 1/2 | In progress | - |
+| 1. API Validation | 2/2 | Complete | 2026-01-10 |
 | 2. Rate Limiting | 0/TBD | Not started | - |
 | 3. JSON Error Handling | 0/TBD | Not started | - |
