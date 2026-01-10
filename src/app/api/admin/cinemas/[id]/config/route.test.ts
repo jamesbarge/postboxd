@@ -158,19 +158,161 @@ describe("Cinema Config API", () => {
       expect(response.status).toBe(400);
     });
 
-    it("returns 400 for tolerance out of range", async () => {
+    it("returns 400 for tolerancePercent below 10", async () => {
       vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as any);
 
       const request = new Request("http://localhost/api/admin/cinemas/bfi-southbank/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tolerancePercent: 100 }),
+        body: JSON.stringify({ tolerancePercent: 5 }),
       });
       const response = await PUT(request, { params: Promise.resolve({ id: "bfi-southbank" }) });
 
       expect(response.status).toBe(400);
       const data = await response.json();
-      expect(data.error).toContain("10 and 80");
+      expect(data.error).toBe("Invalid request body");
+      expect(data.details.fieldErrors.tolerancePercent).toBeDefined();
+    });
+
+    it("returns 400 for tolerancePercent above 100", async () => {
+      vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as any);
+
+      const request = new Request("http://localhost/api/admin/cinemas/bfi-southbank/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tolerancePercent: 150 }),
+      });
+      const response = await PUT(request, { params: Promise.resolve({ id: "bfi-southbank" }) });
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toBe("Invalid request body");
+      expect(data.details.fieldErrors.tolerancePercent).toBeDefined();
+    });
+
+    it("returns 400 for scrapeHorizonDays below 7", async () => {
+      vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as any);
+
+      const request = new Request("http://localhost/api/admin/cinemas/bfi-southbank/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scrapeHorizonDays: 3 }),
+      });
+      const response = await PUT(request, { params: Promise.resolve({ id: "bfi-southbank" }) });
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toBe("Invalid request body");
+      expect(data.details.fieldErrors.scrapeHorizonDays).toBeDefined();
+    });
+
+    it("returns 400 for scrapeHorizonDays above 365", async () => {
+      vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as any);
+
+      const request = new Request("http://localhost/api/admin/cinemas/bfi-southbank/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scrapeHorizonDays: 400 }),
+      });
+      const response = await PUT(request, { params: Promise.resolve({ id: "bfi-southbank" }) });
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toBe("Invalid request body");
+      expect(data.details.fieldErrors.scrapeHorizonDays).toBeDefined();
+    });
+
+    it("returns 400 for invalid maxScrapeDate", async () => {
+      vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as any);
+
+      const request = new Request("http://localhost/api/admin/cinemas/bfi-southbank/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxScrapeDate: "not-a-date" }),
+      });
+      const response = await PUT(request, { params: Promise.resolve({ id: "bfi-southbank" }) });
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toBe("Invalid request body");
+      expect(data.details.fieldErrors.maxScrapeDate).toBeDefined();
+    });
+
+    it("accepts valid maxScrapeDate ISO datetime", async () => {
+      vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as any);
+      mockSelect
+        .mockResolvedValueOnce([{ id: "bfi-southbank" }]) // Cinema exists
+        .mockResolvedValueOnce([]); // No baseline exists
+      mockInsert.mockResolvedValueOnce({ rowCount: 1 });
+
+      const request = new Request("http://localhost/api/admin/cinemas/bfi-southbank/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxScrapeDate: "2026-06-15T00:00:00.000Z" }),
+      });
+      const response = await PUT(request, { params: Promise.resolve({ id: "bfi-southbank" }) });
+
+      expect(response.status).toBe(200);
+    });
+
+    it("accepts null for nullable fields", async () => {
+      vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as any);
+      mockSelect
+        .mockResolvedValueOnce([{ id: "bfi-southbank" }]) // Cinema exists
+        .mockResolvedValueOnce([]); // No baseline exists
+      mockInsert.mockResolvedValueOnce({ rowCount: 1 });
+
+      const request = new Request("http://localhost/api/admin/cinemas/bfi-southbank/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weekdayAvg: null,
+          weekendAvg: null,
+          notes: null,
+          maxScrapeDate: null,
+        }),
+      });
+      const response = await PUT(request, { params: Promise.resolve({ id: "bfi-southbank" }) });
+
+      expect(response.status).toBe(200);
+    });
+
+    it("accepts boundary values for tolerancePercent", async () => {
+      for (const tolerancePercent of [10, 100]) {
+        vi.clearAllMocks();
+        vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as any);
+        mockSelect
+          .mockResolvedValueOnce([{ id: "bfi-southbank" }])
+          .mockResolvedValueOnce([]);
+        mockInsert.mockResolvedValueOnce({ rowCount: 1 });
+
+        const request = new Request("http://localhost/api/admin/cinemas/bfi-southbank/config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tolerancePercent }),
+        });
+        const response = await PUT(request, { params: Promise.resolve({ id: "bfi-southbank" }) });
+        expect(response.status).toBe(200);
+      }
+    });
+
+    it("accepts boundary values for scrapeHorizonDays", async () => {
+      for (const scrapeHorizonDays of [7, 365]) {
+        vi.clearAllMocks();
+        vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as any);
+        mockSelect
+          .mockResolvedValueOnce([{ id: "bfi-southbank" }])
+          .mockResolvedValueOnce([]);
+        mockInsert.mockResolvedValueOnce({ rowCount: 1 });
+
+        const request = new Request("http://localhost/api/admin/cinemas/bfi-southbank/config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scrapeHorizonDays }),
+        });
+        const response = await PUT(request, { params: Promise.resolve({ id: "bfi-southbank" }) });
+        expect(response.status).toBe(200);
+      }
     });
 
     it("updates existing baseline", async () => {
