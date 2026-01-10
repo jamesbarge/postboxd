@@ -1,12 +1,12 @@
-# Roadmap: High Priority Technical Debt
+# Roadmap: Fix Scrapers and Populate February Data
 
 ## Overview
 
-Address 3 critical security and stability concerns identified in the codebase analysis: missing input validation on admin APIs, lack of rate limiting on public endpoints, and unhandled JSON parsing errors. Each phase delivers one fix with comprehensive tests.
+Fix 4 broken cinema scrapers and run all high-priority scrapers to populate screening data through end of February 2026.
 
 ## Domain Expertise
 
-None
+Cinema web scraping - HTML parsing, API integration, Playwright automation
 
 ## Phases
 
@@ -14,51 +14,84 @@ None
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [x] **Phase 1: API Validation** - Add Zod schemas to admin API routes
-- [x] **Phase 2: Rate Limiting** - Apply rate limiting to public API endpoints
-- [x] **Phase 3: JSON Error Handling** - Verify JSON parsing (was false positive, added tests)
+- [ ] **Phase 1: Diagnose Broken Scrapers** - Investigate why 4 scrapers produce no data
+- [ ] **Phase 2: Fix Genesis Cinema** - Repair Genesis scraper (multi-page HTML)
+- [ ] **Phase 3: Fix The Lexi Cinema** - Repair Lexi scraper (simple HTML)
+- [ ] **Phase 4: Fix Phoenix Cinema** - Repair Phoenix scraper
+- [ ] **Phase 5: Fix Castle Sidcup** - Repair Castle Sidcup scraper
+- [ ] **Phase 6: Run High-Priority Scrapers** - Execute Curzon, Everyman, BFI, Barbican, Electric
+- [ ] **Phase 7: Run Remaining Scrapers** - Execute all other scrapers for February data
 
 ## Phase Details
 
-### Phase 1: API Validation
-**Goal**: Prevent crashes from malformed requests by adding Zod validation to admin routes
+### Phase 1: Diagnose Broken Scrapers
+**Goal**: Understand why Genesis, Lexi, Phoenix, and Castle Sidcup scrapers fail
 **Depends on**: Nothing (first phase)
-**Research**: Unlikely (patterns exist in `/api/screenings/route.ts`)
+**Research**: Yes - need to inspect websites and compare to current scrapers
 **Plans**: TBD
 
 Target files:
-- `src/app/api/admin/screenings/[id]/route.ts`
-- `src/app/api/admin/cinemas/[id]/config/route.ts`
+- `src/scrapers/cinemas/genesis.ts`
+- `src/scrapers/cinemas/lexi.ts`
+- `src/scrapers/cinemas/phoenix.ts`
+- `src/scrapers/cinemas/castle.ts`
 
-### Phase 2: Rate Limiting
-**Goal**: Protect public endpoints from abuse by applying existing rate limiting utility
-**Depends on**: Phase 1
-**Research**: Unlikely (utility exists in `src/lib/rate-limit.ts`)
+### Phase 2: Fix Genesis Cinema
+**Goal**: Repair Genesis scraper to produce valid screening data
+**Depends on**: Phase 1 (diagnosis)
+**Research**: Unlikely (will know issue from diagnosis)
 **Plans**: TBD
 
-Target files:
-- `src/app/api/screenings/route.ts`
-- `src/app/api/search/route.ts`
-- `src/app/api/films/search/route.ts`
-
-### Phase 3: JSON Error Handling
-**Goal**: Handle invalid JSON responses gracefully in title-extractor
-**Depends on**: Phase 2
-**Research**: Unlikely (straightforward try-catch pattern)
+### Phase 3: Fix The Lexi Cinema
+**Goal**: Repair Lexi scraper to produce valid screening data
+**Depends on**: Phase 1 (diagnosis)
+**Research**: Unlikely
 **Plans**: TBD
 
-Target file:
-- `src/lib/title-extractor.ts` (lines 64-73)
+### Phase 4: Fix Phoenix Cinema
+**Goal**: Repair Phoenix scraper to produce valid screening data
+**Depends on**: Phase 1 (diagnosis)
+**Research**: Unlikely
+**Plans**: TBD
+
+### Phase 5: Fix Castle Sidcup
+**Goal**: Repair Castle Sidcup scraper to produce valid screening data
+**Depends on**: Phase 1 (diagnosis)
+**Research**: Unlikely
+**Plans**: TBD
+
+### Phase 6: Run High-Priority Scrapers
+**Goal**: Execute main chain scrapers to populate February data
+**Depends on**: Phases 2-5 (all fixes complete)
+**Research**: No
+**Plans**: TBD
+
+Target commands:
+- `npm run scrape:curzon`
+- `npm run scrape:everyman`
+- `npm run scrape:bfi`
+- `npm run scrape:barbican`
+- `npm run scrape:electric`
+
+### Phase 7: Run Remaining Scrapers
+**Goal**: Execute all other scrapers for comprehensive February coverage
+**Depends on**: Phase 6
+**Research**: No
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Validation | 2/2 | Complete | 2026-01-10 |
-| 2. Rate Limiting | 1/1 | Complete | 2026-01-10 |
-| 3. JSON Error Handling | 1/1 | Complete | 2026-01-10 |
+| 1. Diagnose Broken Scrapers | 0/? | Not Started | — |
+| 2. Fix Genesis Cinema | 0/? | Not Started | — |
+| 3. Fix The Lexi Cinema | 0/? | Not Started | — |
+| 4. Fix Phoenix Cinema | 0/? | Not Started | — |
+| 5. Fix Castle Sidcup | 0/? | Not Started | — |
+| 6. Run High-Priority Scrapers | 0/? | Not Started | — |
+| 7. Run Remaining Scrapers | 0/? | Not Started | — |
 
-**Milestone Status:** ✅ COMPLETE
+**Milestone Status:** 0% complete

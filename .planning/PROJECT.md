@@ -1,61 +1,71 @@
-# High Priority Technical Debt
+# Project: Fix Scrapers and Populate February Data
 
-## What This Is
+## Overview
 
-A focused cleanup of 3 high-priority security and stability concerns in the pictures.london codebase. Addressing missing input validation, rate limiting gaps, and error handling holes identified in the codebase analysis.
+Fix broken cinema scrapers and run all high-priority scrapers to populate screening data through end of February 2026.
 
 ## Core Value
 
-Prevent API crashes and abuse by ensuring all request bodies are validated with Zod schemas.
+Ensure users can see complete cinema listings for all London venues through end of February.
 
 ## Requirements
 
 ### Validated
 
-- ✓ Cinema scraping pipeline with TMDB enrichment — existing
-- ✓ User authentication via Clerk — existing
-- ✓ Zustand state management with localStorage persistence — existing
-- ✓ Screenings API with Zod validation — existing
-- ✓ Rate limiting utility exists in codebase — existing
-- ✓ Error handling patterns established (custom error classes) — existing
+- Scraper infrastructure exists (BaseScraper, pipeline, utilities)
+- Database schema supports screening storage
+- 54 cinemas currently have some data
 
 ### Active
 
-- [ ] Add Zod validation to admin API routes (`/api/admin/screenings/[id]`, `/api/admin/cinemas/[id]/config`)
-- [ ] Apply rate limiting to public API routes (`/api/screenings`, `/api/search`, `/api/films/search`)
-- [ ] Fix JSON parsing error handling in title-extractor
+- [ ] Fix Genesis Cinema scraper (no data)
+- [ ] Fix The Lexi Cinema scraper (no data)
+- [ ] Fix Phoenix Cinema scraper (no data)
+- [ ] Fix Castle Cinema Sidcup scraper (no data)
+- [ ] Run Curzon scraper (10 venues, data ends mid-Jan)
+- [ ] Run Everyman scraper (15 venues, data ends mid-Jan)
+- [ ] Run BFI scraper (data ends mid-Jan)
+- [ ] Run Barbican scraper (data ends Jan 17)
+- [ ] Run Electric scraper (data ends Jan 15)
+- [ ] Run all remaining scrapers for February data
 
 ### Out of Scope
 
-- Medium priority concerns (webhook validation, agent persistence, schema migrations) — deferred to future milestone
-- Low priority concerns (component refactoring, scraper cleanup, documentation) — not in scope
-- New features — this is purely technical debt reduction
-
-## Context
-
-The codebase analysis on 2026-01-10 identified 10 technical concerns. The 3 high-priority items all relate to input handling:
-
-1. **Admin APIs** accept raw JSON without schema validation, risking crashes from malformed requests
-2. **Public APIs** have no rate limiting despite a utility existing in `src/lib/rate-limit.ts`
-3. **Title extractor** calls `JSON.parse()` on Claude responses without try-catch
-
-Existing patterns to follow:
-- `/api/screenings/route.ts` has proper Zod validation — use as template
-- `src/lib/rate-limit.ts` has rate limiting implementation ready to apply
-- Custom error classes exist in `src/lib/api-errors.ts`
-
-## Constraints
-
-- **Testing**: Each fix must include tests verifying the fix works
-- **Pattern consistency**: Follow existing codebase patterns (Zod schemas, error handling)
-- **Minimal changes**: Fix the issues, don't refactor surrounding code
+- Adding new cinemas not already in the system
+- Scraper performance optimization
+- UI changes
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| High priority only | Focus on critical security/stability issues first | — Pending |
-| Tests required | Verify fixes work and prevent regressions | — Pending |
+| Fix broken scrapers first | No point running a scraper that doesn't work | Pending |
+| Prioritize high-traffic venues | Curzon/Everyman/BFI are most popular | Pending |
+
+## Technical Context
+
+### Scraper Types
+- **Playwright**: BFI, Curzon, Everyman (JS-heavy sites)
+- **Cheerio/Fetch**: Most independents (static HTML)
+- **API-based**: Picturehouse, Electric (fastest)
+
+### Known Issues from Playbook
+- Genesis: Multi-page HTML scraper, may have selector changes
+- Lexi: Simple HTML scraper, likely selector drift
+- Phoenix: Unknown - needs investigation
+- Castle Sidcup: Unknown - needs investigation
+
+### Database State (as of diagnostic)
+- Total future screenings: 2,872
+- Cinemas with no data: 4
+- Cinemas with data ending mid-Jan: ~20
+
+## Success Criteria
+
+- [ ] All 4 broken scrapers fixed and producing data
+- [ ] All high-priority scrapers run successfully
+- [ ] Screening data available through Feb 28, 2026
+- [ ] No regressions in working scrapers
 
 ---
 *Last updated: 2026-01-10 after initialization*
