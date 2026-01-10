@@ -8,33 +8,49 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { screenings, films, cinemas } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { BadRequestError, handleApiError } from "@/lib/api-errors";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-interface UpdateScreeningBody {
-  filmId?: string;
-  cinemaId?: string;
-  datetime?: string;
-  bookingUrl?: string;
-  format?: string | null;
-  screen?: string | null;
-  eventType?: string | null;
-  eventDescription?: string | null;
-}
+// Zod schema for PUT - full update
+const updateScreeningSchema = z.object({
+  filmId: z.string().uuid().optional(),
+  cinemaId: z.string().uuid().optional(),
+  datetime: z.string().datetime().optional(),
+  bookingUrl: z.string().url().optional(),
+  format: z.string().nullable().optional(),
+  screen: z.string().nullable().optional(),
+  eventType: z.string().nullable().optional(),
+  eventDescription: z.string().nullable().optional(),
+});
+
+// Zod schema for PATCH - lightweight inline editing
+const patchScreeningSchema = z.object({
+  datetime: z.string().datetime().optional(),
+  format: z.string().nullable().optional(),
+  screen: z.string().nullable().optional(),
+  eventType: z.string().nullable().optional(),
+});
 
 export async function PUT(request: Request, { params }: RouteParams) {
-  // Verify admin auth
-  const { userId } = await auth();
-  if (!userId) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { id: screeningId } = await params;
-
   try {
-    const body: UpdateScreeningBody = await request.json();
+    // Verify admin auth
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id: screeningId } = await params;
+
+    // Validate request body with Zod
+    const parseResult = updateScreeningSchema.safeParse(await request.json());
+    if (!parseResult.success) {
+      throw new BadRequestError("Invalid request body", parseResult.error.flatten());
+    }
+    const body = parseResult.data;
 
     // Verify screening exists
     const [existing] = await db
@@ -73,23 +89,17 @@ export async function PUT(request: Request, { params }: RouteParams) {
       }
     }
 
-    // Parse datetime if provided
-    let screeningDate: Date | undefined;
-    if (body.datetime) {
-      screeningDate = new Date(body.datetime);
-      if (isNaN(screeningDate.getTime())) {
-        return Response.json({ error: "Invalid datetime format" }, { status: 400 });
-      }
-    }
-
     // Build update object with only provided fields
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
+      // Mark as manually edited to protect from scraper overwrites
+      manuallyEdited: true,
+      editedAt: new Date(),
     };
 
     if (body.filmId) updateData.filmId = body.filmId;
     if (body.cinemaId) updateData.cinemaId = body.cinemaId;
-    if (screeningDate) updateData.datetime = screeningDate;
+    if (body.datetime) updateData.datetime = new Date(body.datetime);
     if (body.bookingUrl !== undefined) updateData.bookingUrl = body.bookingUrl;
     if (body.format !== undefined) updateData.format = body.format;
     if (body.screen !== undefined) updateData.screen = body.screen;
@@ -106,11 +116,65 @@ export async function PUT(request: Request, { params }: RouteParams) {
       message: "Screening updated",
     });
   } catch (error) {
-    console.error("Error updating screening:", error);
-    return Response.json(
-      { error: "Failed to update screening" },
-      { status: 500 }
-    );
+    return handleApiError(error, "PUT /api/admin/screenings/[id]");
+  }
+}
+
+/**
+ * PATCH - Lightweight update for inline editing
+ * Only updates the specified field(s) and marks as manually edited
+ */
+export async function PATCH(request: Request, { params }: RouteParams) {
+  try {
+    // Verify admin auth
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id: screeningId } = await params;
+
+    // Validate request body with Zod
+    const parseResult = patchScreeningSchema.safeParse(await request.json());
+    if (!parseResult.success) {
+      throw new BadRequestError("Invalid request body", parseResult.error.flatten());
+    }
+    const body = parseResult.data;
+
+    // Verify screening exists
+    const [existing] = await db
+      .select({ id: screenings.id })
+      .from(screenings)
+      .where(eq(screenings.id, screeningId))
+      .limit(1);
+
+    if (!existing) {
+      return Response.json({ error: "Screening not found" }, { status: 404 });
+    }
+
+    // Build update object
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
+      manuallyEdited: true,
+      editedAt: new Date(),
+    };
+
+    // Only update fields that are explicitly provided
+    if (body.datetime !== undefined) {
+      updateData.datetime = new Date(body.datetime);
+    }
+    if (body.format !== undefined) updateData.format = body.format;
+    if (body.screen !== undefined) updateData.screen = body.screen;
+    if (body.eventType !== undefined) updateData.eventType = body.eventType;
+
+    await db
+      .update(screenings)
+      .set(updateData)
+      .where(eq(screenings.id, screeningId));
+
+    return Response.json({ success: true });
+  } catch (error) {
+    return handleApiError(error, "PATCH /api/admin/screenings/[id]");
   }
 }
 
