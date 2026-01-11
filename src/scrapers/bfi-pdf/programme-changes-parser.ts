@@ -27,10 +27,13 @@ async function proxyFetch(url: string): Promise<Response> {
   const scraperApiKey = process.env.SCRAPER_API_KEY;
 
   if (scraperApiKey) {
+    // Use ScraperAPI to bypass Cloudflare
+    // Note: render=true was causing timeouts (~12s per request). Without it, requests take ~1s
+    // and still bypass Cloudflare protection successfully.
+    const trimmedKey = scraperApiKey.trim();
     const proxyUrl = new URL("https://api.scraperapi.com/");
-    proxyUrl.searchParams.set("api_key", scraperApiKey);
+    proxyUrl.searchParams.set("api_key", trimmedKey);
     proxyUrl.searchParams.set("url", url);
-    proxyUrl.searchParams.set("render", "true"); // Need JS rendering to bypass Cloudflare
 
     console.log(`[BFI-Changes] Using ScraperAPI proxy for: ${url.slice(0, 60)}...`);
     return fetch(proxyUrl.toString());

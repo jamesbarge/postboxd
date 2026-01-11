@@ -22,17 +22,19 @@ import { createHash } from "crypto";
 async function proxyFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const scraperApiKey = process.env.SCRAPER_API_KEY;
 
-  // Skip proxy for direct file downloads (PDF CDN doesn't need Cloudflare bypass)
-  const skipProxy = url.includes("core-cms.bfi.org.uk");
-
-  if (scraperApiKey && !skipProxy) {
+  // Both the BFI website and PDF CDN are behind Cloudflare and may block datacenter IPs
+  // So we proxy all requests through ScraperAPI when available
+  if (scraperApiKey) {
     // Use ScraperAPI to bypass Cloudflare
+    // Note: render=true was causing timeouts (~12s per request). Without it, requests take ~1s
+    // and still bypass Cloudflare protection successfully.
+    const trimmedKey = scraperApiKey.trim();
     const proxyUrl = new URL("https://api.scraperapi.com/");
-    proxyUrl.searchParams.set("api_key", scraperApiKey);
+    proxyUrl.searchParams.set("api_key", trimmedKey);
     proxyUrl.searchParams.set("url", url);
-    proxyUrl.searchParams.set("render", "true"); // Need JS rendering to bypass Cloudflare
 
     console.log(`[BFI-PDF] Using ScraperAPI proxy for: ${url.slice(0, 60)}...`);
+
 
     return fetch(proxyUrl.toString(), {
       ...options,
@@ -215,6 +217,11 @@ export async function downloadPDF(info: PDFInfo): Promise<FetchedPDF> {
   const response = await proxyFetch(url);
 
   if (!response.ok) {
+    // Log detailed error info for debugging
+    const responseText = await response.text().catch(() => 'Unable to read response body');
+    console.error(`[BFI-PDF] Download failed for ${url}`);
+    console.error(`[BFI-PDF] Status: ${response.status} ${response.statusText}`);
+    console.error(`[BFI-PDF] Response preview: ${responseText.slice(0, 500)}`);
     throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`);
   }
 
