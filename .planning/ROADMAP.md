@@ -20,7 +20,7 @@ Cinema web scraping — HTML parsing, API integration, Playwright automation (ex
 - [x] **Phase 4: BFI Season Scraper** — First implementation ✓
 - [x] **Phase 5: Additional Cinema Scrapers** — Barbican, Close-Up, PCC, ICA ✓
 - [x] **Phase 6: Director Enrichment** — TMDB integration for director data ✓
-- [ ] **Phase 7: /seasons Page** — Season cards and detail views
+- [x] **Phase 7: /seasons Page** — Season cards and detail views ✓
 - [ ] **Phase 8: Director Pages** — Browse by director
 - [ ] **Phase 9: Calendar Integration** — Seasons as filters/tags
 - [ ] **Phase 10: Polish & Metadata** — Related seasons, UI refinement
@@ -140,15 +140,28 @@ Plans:
 - Enrichment script caches director lookups to avoid duplicate TMDB queries
 - Rate limited to 40 requests per 10 seconds (300ms delays)
 
-### Phase 7: /seasons Page
+### Phase 7: /seasons Page ✓
 **Goal**: Create dedicated page for browsing all current seasons with cards
 **Depends on**: Phase 4 (need data to display)
 **Research**: Unlikely (internal UI patterns)
-**Plans**: TBD
+**Plans**: Complete
+**Completed**: 2026-01-11
 
 Plans:
-- [ ] 07-01: Create seasons browse page
-- [ ] 07-02: Create season detail page
+- [x] 07-01: Create seasons browse page
+- [x] 07-02: Create season detail page
+
+**Key Deliverables:**
+- `src/app/seasons/page.tsx` - Browse page with season cards, status badges, film counts
+- `src/app/seasons/[slug]/page.tsx` - Detail page with films, upcoming screenings
+- SEO: ItemListSchema, BreadcrumbSchema, generateMetadata
+- Features: ongoing/upcoming status, date ranges, venue display, film posters
+
+**Implementation Notes:**
+- Follows existing patterns from /cinemas and /festivals pages
+- Server components with `force-dynamic` for fresh data
+- Cards link to detail page, films link to /film/[id]
+- Screenings shown with booking links on detail page
 
 ### Phase 8: Director Pages
 **Goal**: Create director detail pages showing their seasons and screenings
@@ -187,7 +200,7 @@ Plans:
 | 4. BFI Season Scraper | 1/1 | Complete | 2026-01-11 |
 | 5. Additional Cinema Scrapers | 1/1 | Complete | 2026-01-11 |
 | 6. Director Enrichment | 1/1 | Complete | 2026-01-11 |
-| 7. /seasons Page | 0/2 | Not started | - |
+| 7. /seasons Page | 2/2 | Complete | 2026-01-11 |
 | 8. Director Pages | 0/1 | Not started | - |
 | 9. Calendar Integration | 0/1 | Not started | - |
 | 10. Polish & Metadata | 0/1 | Not started | - |
