@@ -21,9 +21,11 @@ import { createHash } from "crypto";
  */
 async function proxyFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const scraperApiKey = process.env.SCRAPER_API_KEY;
-  console.log(`[BFI-PDF] SCRAPER_API_KEY ${scraperApiKey ? "found" : "NOT FOUND"}`);
 
-  if (scraperApiKey) {
+  // Skip proxy for direct file downloads (PDF CDN doesn't need Cloudflare bypass)
+  const skipProxy = url.includes("core-cms.bfi.org.uk");
+
+  if (scraperApiKey && !skipProxy) {
     // Use ScraperAPI to bypass Cloudflare
     const proxyUrl = new URL("https://api.scraperapi.com/");
     proxyUrl.searchParams.set("api_key", scraperApiKey);
