@@ -240,9 +240,14 @@ export function MobileDatePickerModal({ isOpen, onClose }: MobileDatePickerModal
           {/* Custom Time Toggle */}
           <button
             onClick={() => setShowTimeCustom(!showTimeCustom)}
-            className="text-sm text-accent-primary hover:text-accent-primary-hover transition-colors font-medium"
+            className={cn(
+              "mt-1 px-4 py-2 rounded-lg text-sm font-medium transition-all border",
+              showTimeCustom
+                ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
+                : "border-border-default bg-background-secondary text-text-secondary hover:border-border-emphasis hover:text-text-primary"
+            )}
           >
-            {showTimeCustom ? "Hide custom time" : "Set custom time range"}
+            {showTimeCustom ? "Hide custom range" : "Set custom range"}
           </button>
 
           {/* Custom Time Inputs */}
