@@ -22,8 +22,42 @@ import { createHash } from "crypto";
 async function proxyFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const scraperApiKey = process.env.SCRAPER_API_KEY;
 
-  // Both the BFI website and PDF CDN are behind Cloudflare and may block datacenter IPs
-  // So we proxy all requests through ScraperAPI when available
+  // For PDF downloads, try direct first (faster) - only proxy if blocked
+  const isPdfDownload = url.includes("core-cms.bfi.org.uk");
+
+  if (isPdfDownload) {
+    console.log(`[BFI-PDF] Trying direct download for PDF: ${url.slice(0, 60)}...`);
+    const directResponse = await fetch(url, {
+      ...options,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/pdf,*/*",
+        "Accept-Language": "en-GB,en;q=0.9",
+        ...options.headers,
+      },
+    });
+
+    // If direct download works, return it
+    if (directResponse.ok) {
+      console.log(`[BFI-PDF] Direct download succeeded`);
+      return directResponse;
+    }
+
+    // If blocked and we have ScraperAPI, try proxy
+    if (scraperApiKey && (directResponse.status === 403 || directResponse.status === 500)) {
+      console.log(`[BFI-PDF] Direct download blocked (${directResponse.status}), trying ScraperAPI...`);
+      const trimmedKey = scraperApiKey.trim();
+      const proxyUrl = new URL("https://api.scraperapi.com/");
+      proxyUrl.searchParams.set("api_key", trimmedKey);
+      proxyUrl.searchParams.set("url", url);
+      return fetch(proxyUrl.toString());
+    }
+
+    // Return the failed response
+    return directResponse;
+  }
+
+  // For non-PDF URLs (HTML pages), use ScraperAPI if available
   if (scraperApiKey) {
     // Use ScraperAPI to bypass Cloudflare
     // Note: render=true was causing timeouts (~12s per request). Without it, requests take ~1s
