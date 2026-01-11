@@ -170,6 +170,7 @@ export function MobileDatePickerModal({ isOpen, onClose }: MobileDatePickerModal
           <div className="bg-background-tertiary rounded-xl p-3">
             <DayPicker
               mode="single"
+              weekStartsOn={1}
               selected={dateFrom || undefined}
               onSelect={handleDaySelect}
               defaultMonth={dateFrom || today}
