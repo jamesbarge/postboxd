@@ -1,6 +1,6 @@
 # Pictures
 
-**The London Cinema Calendar** — Aggregating screenings from 20+ cinemas into one unified view.
+**The London Cinema Calendar** — Aggregating screenings from 60+ cinemas into one unified view.
 
 **Live at [pictures.london](https://pictures.london)**
 
@@ -8,7 +8,7 @@
 
 ## What is this?
 
-London has an incredible cinema scene, but finding what's showing means checking 20 different websites. Pictures solves this by scraping listings from venues like BFI Southbank, Prince Charles Cinema, Curzon, Picturehouse, ICA, Barbican, Odeon, and more — presenting everything in one filterable calendar.
+London has an incredible cinema scene, but finding what's showing means checking dozens of different websites. Pictures solves this by scraping listings from venues like BFI Southbank, Prince Charles Cinema, Curzon, Picturehouse, ICA, Barbican, and more — presenting everything in one filterable calendar.
 
 ### Features
 
@@ -21,9 +21,9 @@ London has an incredible cinema scene, but finding what's showing means checking
 
 ### Cinemas covered
 
-**Chains:** Curzon (10 venues), Picturehouse (8 venues), Everyman (15+ venues)
+**Chains:** Curzon (11 venues), Picturehouse (10 venues), Everyman (15 venues)
 
-**Independents:** BFI Southbank, Prince Charles Cinema, ICA, Barbican, Rio Cinema, Genesis, Peckhamplex, The Nickel, Electric Cinema, Lexi Cinema, Garden Cinema, Close-Up Cinema, Ciné Lumière, Castle Cinema, ArtHouse Crouch End, Phoenix Cinema, Rich Mix, Regent Street Cinema, Riverside Studios, Olympic Cinema, David Lean Cinema
+**Independents:** BFI Southbank, BFI IMAX, Prince Charles Cinema, ICA, Barbican, Rio Cinema, Genesis, Peckhamplex, The Nickel, Electric Cinema (2 venues), Lexi Cinema, Garden Cinema, Close-Up Cinema, Ciné Lumière, Castle Cinema, Castle Sidcup, ArtHouse Crouch End, Phoenix Cinema, Rich Mix, Regent Street Cinema, Riverside Studios, Olympic Cinema, David Lean Cinema, Gate Notting Hill, Screen on the Green, Coldharbour Blue
 
 ---
 
@@ -38,6 +38,7 @@ London has an incredible cinema scene, but finding what's showing means checking
 | Analytics | PostHog (EU hosted) |
 | Hosting | Vercel |
 | Scraping | Playwright + Cheerio |
+| Scheduling | Inngest (daily) + GitHub Actions (weekly) |
 | AI Agents | Claude Agent SDK |
 | Styling | Tailwind CSS v4 |
 
@@ -85,7 +86,6 @@ DATABASE_URL=postgresql://...
 
 # TMDB API (for film metadata)
 TMDB_API_KEY=your_key
-TMDB_READ_ACCESS_TOKEN=your_token
 
 # Clerk Auth
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
@@ -161,6 +161,28 @@ npm run agents:links    # Verify booking URLs
 npm run agents:health   # Check scraper output
 npm run agents:enrich   # Improve TMDB matching
 ```
+
+---
+
+## Automated Scraping
+
+Scrapers run automatically via two mechanisms:
+
+### Daily (Inngest)
+Cheerio-based scrapers run daily at 6 AM UTC via Inngest functions on Vercel:
+- All independent cinemas with static HTML (Rio, Prince Charles, ICA, Genesis, etc.)
+
+### Weekly (GitHub Actions)
+Playwright-based scrapers run every Sunday at 10 PM UTC via GitHub Actions:
+- **Chains:** Curzon, Picturehouse, Everyman
+- **Independents:** BFI, Barbican, Phoenix, Electric, Lexi, Regent Street
+
+The workflow can also be triggered manually from the Actions tab.
+
+### Required GitHub Secrets
+For the Playwright workflow to run:
+- `DATABASE_URL` — Supabase connection string
+- `TMDB_API_KEY` — TMDB API key
 
 ---
 
