@@ -33,51 +33,63 @@ async function fetchLetterboxdRating(
   year?: number | null
 ): Promise<{ rating: number; url: string } | null> {
   const slug = titleToSlug(title, year);
-  const url = `https://letterboxd.com/film/${slug}/`;
+  const headers = {
+    "User-Agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    Accept: "text/html",
+  };
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-        Accept: "text/html",
-      },
-    });
+    // If we have a year, try year-suffixed URL FIRST to avoid wrong film matches
+    // e.g., "Paprika (2006)" should try /film/paprika-2006/ before /film/paprika/
+    if (year) {
+      const urlWithYear = `https://letterboxd.com/film/${slug}-${year}/`;
+      const yearResponse = await fetch(urlWithYear, { headers });
+
+      if (yearResponse.ok) {
+        const html = await yearResponse.text();
+        const result = parseRatingWithVerification(html, urlWithYear, year);
+        if (result) return result;
+      }
+    }
+
+    // Try plain URL (either no year, or year-suffixed URL failed)
+    const url = `https://letterboxd.com/film/${slug}/`;
+    const response = await fetch(url, { headers });
 
     if (!response.ok) {
-      // Try with year suffix for disambiguation
-      if (year) {
-        const urlWithYear = `https://letterboxd.com/film/${slug}-${year}/`;
-        const retryResponse = await fetch(urlWithYear, {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-            Accept: "text/html",
-          },
-        });
-
-        if (!retryResponse.ok) {
-          return null;
-        }
-
-        const html = await retryResponse.text();
-        return parseRating(html, urlWithYear);
-      }
       return null;
     }
 
     const html = await response.text();
-    return parseRating(html, url);
+    return parseRatingWithVerification(html, url, year);
   } catch (error) {
     return null;
   }
 }
 
-function parseRating(
+/**
+ * Parse rating and verify year matches expected year
+ * Letterboxd URLs can match wrong films with same title but different year
+ */
+function parseRatingWithVerification(
   html: string,
-  url: string
+  url: string,
+  expectedYear?: number | null
 ): { rating: number; url: string } | null {
   const $ = cheerio.load(html);
+
+  // Extract year from page to verify we have the right film
+  // Year is in: <meta property="og:title" content="Paprika (2006)">
+  // Or in: <small class="number"><a href="/films/year/2006/">2006</a></small>
+  const ogTitle = $('meta[property="og:title"]').attr("content") || "";
+  const yearMatch = ogTitle.match(/\((\d{4})\)$/);
+  const pageYear = yearMatch ? parseInt(yearMatch[1], 10) : null;
+
+  // If we expect a year and the page year doesn't match (within 1 year tolerance), reject
+  if (expectedYear && pageYear && Math.abs(pageYear - expectedYear) > 1) {
+    return null;
+  }
 
   // Rating is in meta tag: <meta name="twitter:data2" content="4.53 out of 5">
   const ratingMeta = $('meta[name="twitter:data2"]').attr("content");
