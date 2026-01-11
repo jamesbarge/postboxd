@@ -237,15 +237,7 @@ function FilterDropdown({ label, options, selected, onToggle, icon, singleSelect
               return (
                 <button
                   key={value}
-                  onClick={() => {
-                      if (singleSelect) {
-                          // For single select, if clicking other option, switch to it. 
-                          // If clicking selected, toggle it off (handled by parent logic typically, but here we just call onToggle)
-                          onToggle(value);
-                      } else {
-                         onToggle(value);
-                      }
-                  }}
+                  onClick={() => onToggle(value)}
                   className={cn(
                     "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2",
                     isSelected
@@ -289,70 +281,54 @@ function FilterDropdown({ label, options, selected, onToggle, icon, singleSelect
   );
 }
 
+interface FilterPill {
+  label: string;
+  onRemove: () => void;
+}
+
+function addArrayPills<T>(
+  items: T[],
+  pills: FilterPill[],
+  getLabel: (item: T) => string,
+  onRemove: (item: T) => void
+): void {
+  items.forEach((item) => {
+    pills.push({ label: getLabel(item), onRemove: () => onRemove(item) });
+  });
+}
+
 // Active Filter Pills Display
 function ActiveFilterPills({ festivals = [] }: { festivals?: { id: string; name: string; slug: string }[] }) {
   const filters = useFilters();
-
-  const pills: { label: string; onRemove: () => void }[] = [];
+  const pills: FilterPill[] = [];
 
   // Date range
   if (filters.dateFrom || filters.dateTo) {
-    pills.push({
-      label: filters.dateFrom && filters.dateTo
-        ? `${filters.dateFrom.toLocaleDateString()} - ${filters.dateTo.toLocaleDateString()}`
-        : "Date range",
-      onRemove: () => filters.setDateRange(null, null),
-    });
+    const label = filters.dateFrom && filters.dateTo
+      ? `${filters.dateFrom.toLocaleDateString()} - ${filters.dateTo.toLocaleDateString()}`
+      : "Date range";
+    pills.push({ label, onRemove: () => filters.setDateRange(null, null) });
   }
 
-  // Formats
-  filters.formats.forEach((f) => {
-    const option = FORMAT_OPTIONS.find((o) => o.value === f);
-    pills.push({
-      label: option?.label || f,
-      onRemove: () => filters.toggleFormat(f),
-    });
-  });
-
-  // Programming types
-  filters.programmingTypes.forEach((t) => {
-    pills.push({
-      label: getProgrammingTypeLabel(t),
-      onRemove: () => filters.toggleProgrammingType(t),
-    });
-  });
-
-  // Decades
-  filters.decades.forEach((d) => {
-    pills.push({
-      label: d,
-      onRemove: () => filters.toggleDecade(d),
-    });
-  });
-
-  // Genres
-  filters.genres.forEach((g) => {
-    pills.push({
-      label: g,
-      onRemove: () => filters.toggleGenre(g),
-    });
-  });
-
-  // Times of day
-  filters.timesOfDay.forEach((t) => {
-    pills.push({
-      label: getTimeOfDayLabel(t).split(" ")[0], // Just the time name
-      onRemove: () => filters.toggleTimeOfDay(t),
-    });
-  });
+  // Array-based filters
+  addArrayPills(
+    filters.formats,
+    pills,
+    (f) => FORMAT_OPTIONS.find((o) => o.value === f)?.label || f,
+    filters.toggleFormat
+  );
+  addArrayPills(filters.programmingTypes, pills, getProgrammingTypeLabel, filters.toggleProgrammingType);
+  addArrayPills(filters.decades, pills, (d) => d, filters.toggleDecade);
+  addArrayPills(filters.genres, pills, (g) => g, filters.toggleGenre);
+  addArrayPills(filters.timesOfDay, pills, (t) => getTimeOfDayLabel(t).split(" ")[0], filters.toggleTimeOfDay);
 
   // Festival
   if (filters.festivalSlug) {
-      const festival = festivals.find(f => f.slug === filters.festivalSlug);
-      pills.push({
-          label: festival ? festival.name : "Festival",
-          onRemove: () => filters.setFestivalFilter(null),
-      });
+    const festival = festivals.find((f) => f.slug === filters.festivalSlug);
+    pills.push({
+      label: festival ? festival.name : "Festival",
+      onRemove: () => filters.setFestivalFilter(null),
+    });
   }
 
   // Single showing

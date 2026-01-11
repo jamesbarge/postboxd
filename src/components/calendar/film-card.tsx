@@ -10,19 +10,15 @@
 
 import Link from "next/link";
 import Image from "next/image";
-
-// Tiny 10x15 dark gray placeholder for blur effect during image load
-// This matches the 2:3 aspect ratio of movie posters
-const POSTER_BLUR_PLACEHOLDER =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAPCAYAAADd/14OAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAKklEQVQoz2Nk+M/AQAxgZGBg+M9AB2BkYGBgZGRgYGCgF2D4T7wexAAGABPmAhHXnXDuAAAAAElFTkSuQmCC";
 import { cn } from "@/lib/cn";
-import { Heart, X } from "lucide-react";
-import { useFilmStatus, type FilmStatus } from "@/stores/film-status";
+import { POSTER_BLUR_PLACEHOLDER } from "@/lib/constants";
+import { useFilmStatus } from "@/stores/film-status";
 import { useFilters } from "@/stores/filters";
 import { memo } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { usePostHog } from "posthog-js/react";
 import { usePrefetch } from "@/hooks/usePrefetch";
+import { FilmStatusButtons } from "./film-status-buttons";
 
 interface FilmCardProps {
   film: {
@@ -54,10 +50,7 @@ export const FilmCard = memo(function FilmCard({
   const posthog = usePostHog();
 
   // Performance: Use selectors to only subscribe to this specific film's status
-  // This prevents all cards from re-rendering when any status changes
-  const filmId = film.id;
-  const rawStatus = useFilmStatus((state) => state.films[filmId]?.status ?? null);
-  const setStatus = useFilmStatus((state) => state.setStatus);
+  const rawStatus = useFilmStatus((state) => state.films[film.id]?.status ?? null);
 
   // Check if repertory filter is active - if so, don't show "rep" badge (redundant)
   const isRepertoryFilterActive = useFilters((state) => state.programmingTypes.includes("repertory"));
@@ -68,7 +61,7 @@ export const FilmCard = memo(function FilmCard({
   const prefetch = usePrefetch(`/film/${film.id}`);
 
   // Track film card clicks
-  const trackCardClick = () => {
+  function trackCardClick(): void {
     posthog.capture("film_card_clicked", {
       film_id: film.id,
       film_title: film.title,
@@ -77,41 +70,10 @@ export const FilmCard = memo(function FilmCard({
       cinema_count: cinemaCount,
       special_formats: specialFormats,
     });
-  };
+  }
 
   // Apply mounted guard for hydration safety (localStorage not available during SSR)
   const status = mounted ? rawStatus : null;
-
-  const handleStatusClick = (e: React.MouseEvent, newStatus: FilmStatus) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Toggle off if already set to this status
-    if (status === newStatus) {
-      posthog.capture("film_status_removed", {
-        film_id: film.id,
-        film_title: film.title,
-        previous_status: newStatus,
-      });
-      setStatus(film.id, null);
-      return;
-    }
-
-    // Track status change
-    posthog.capture("film_status_set", {
-      film_id: film.id,
-      film_title: film.title,
-      status: newStatus,
-    });
-
-    // Always pass film metadata so it can be displayed in settings/lists
-    setStatus(film.id, newStatus, {
-      title: film.title,
-      year: film.year,
-      directors: film.directors,
-      posterUrl: film.posterUrl,
-    });
-  };
 
   const screeningLabel = screeningCount === 1 ? "showing" : "showings";
   // Use cinema name when there's only one, otherwise use count
@@ -164,43 +126,16 @@ export const FilmCard = memo(function FilmCard({
 
         {/* Status buttons - outside aria-hidden Link for accessibility */}
         {mounted && (
-          <div
-            className={cn(
-              "absolute top-2 left-2 z-10 flex flex-col gap-1",
-              "opacity-0 group-hover:opacity-100 transition-opacity duration-200",
-              // Always show if a status is set
-              status && "opacity-100"
-            )}
-          >
-            <button
-              onClick={(e) => handleStatusClick(e, "want_to_see")}
-              className={cn(
-                "w-7 h-7 flex items-center justify-center rounded-full transition-all shadow-sm",
-                status === "want_to_see"
-                  ? "bg-accent-danger text-white"
-                  : "bg-black/60 text-white/80 hover:bg-accent-danger hover:text-white"
-              )}
-              aria-label={status === "want_to_see" ? "Remove from watchlist" : "Add to watchlist"}
-            >
-              <Heart
-                className={cn("w-3.5 h-3.5", status === "want_to_see" && "fill-current")}
-              />
-            </button>
-            <button
-              onClick={(e) => handleStatusClick(e, "not_interested")}
-              className={cn(
-                "w-7 h-7 flex items-center justify-center rounded-full transition-all shadow-sm",
-                status === "not_interested"
-                  ? "bg-neutral-700 text-white"
-                  : "bg-black/60 text-white/80 hover:bg-neutral-600 hover:text-white"
-              )}
-              aria-label={
-                status === "not_interested" ? "Show this film again" : "Not interested in this film"
-              }
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <FilmStatusButtons
+            filmId={film.id}
+            filmData={{
+              title: film.title,
+              year: film.year,
+              directors: film.directors,
+              posterUrl: film.posterUrl,
+            }}
+            status={status}
+          />
         )}
 
       </div>

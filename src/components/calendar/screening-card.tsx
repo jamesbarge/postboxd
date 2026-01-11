@@ -11,19 +11,17 @@
 import Link from "next/link";
 import Image from "next/image";
 import { format } from "date-fns";
-
-// Tiny 10x15 dark gray placeholder for blur effect during image load
-// This matches the 2:3 aspect ratio of movie posters
-const POSTER_BLUR_PLACEHOLDER =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAPCAYAAADd/14OAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAKklEQVQoz2Nk+M/AQAxgZGBg+M9AB2BkYGBgZGRgYGCgF2D4T7wexAAGABPmAhHXnXDuAAAAAElFTkSuQmCC";
 import { cn } from "@/lib/cn";
-import { Heart, X } from "lucide-react";
-import { useFilmStatus, type FilmStatus } from "@/stores/film-status";
+import { POSTER_BLUR_PLACEHOLDER, getSpecialFormat } from "@/lib/constants";
+import { useFilmStatus } from "@/stores/film-status";
 import { useFilters } from "@/stores/filters";
 import { memo } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { usePostHog } from "posthog-js/react";
 import { usePrefetch } from "@/hooks/usePrefetch";
+import { FilmStatusButtons } from "./film-status-buttons";
+
+type AvailabilityStatus = "available" | "low" | "sold_out" | "returns" | "unknown" | null;
 
 interface ScreeningCardProps {
   screening: {
@@ -34,7 +32,7 @@ interface ScreeningCardProps {
     eventType?: string | null;
     eventDescription?: string | null;
     bookingUrl: string;
-    availabilityStatus?: "available" | "low" | "sold_out" | "returns" | "unknown" | null;
+    availabilityStatus?: AvailabilityStatus;
     film: {
       id: string;
       title: string;
@@ -52,24 +50,28 @@ interface ScreeningCardProps {
   };
 }
 
-// Formats considered "special" and worth highlighting
-const SPECIAL_FORMATS = ["35mm", "70mm", "imax", "4k"];
+const AVAILABILITY_CONFIG: Record<string, { label: string; bgClass: string; textClass: string }> = {
+  sold_out: { label: "Sold Out", bgClass: "bg-accent-danger/90", textClass: "text-white" },
+  low: { label: "Low Availability", bgClass: "bg-amber-500/90", textClass: "text-white" },
+  returns: { label: "Returns Only", bgClass: "bg-accent-gold/90", textClass: "text-black" },
+};
 
-function getSpecialFormat(format: string | null | undefined): string | null {
-  if (!format) return null;
-  const lower = format.toLowerCase();
-  // Return the original format string if it matches a special format
-  for (const special of SPECIAL_FORMATS) {
-    if (lower.includes(special)) {
-      // Return a normalized display version
-      if (lower.includes("70mm")) return "70mm";
-      if (lower.includes("35mm")) return "35mm";
-      if (lower.includes("imax")) return "IMAX";
-      if (lower.includes("4k")) return "4K";
-    }
-  }
-  return null;
+function AvailabilityBadge({ status }: { status: AvailabilityStatus }): React.ReactElement | null {
+  if (!status || !AVAILABILITY_CONFIG[status]) return null;
+  const config = AVAILABILITY_CONFIG[status];
+  return (
+    <div className="absolute top-3 right-3 z-10">
+      <span className={cn(
+        "px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded backdrop-blur-sm",
+        config.bgClass,
+        config.textClass
+      )}>
+        {config.label}
+      </span>
+    </div>
+  );
 }
+
 
 export const ScreeningCard = memo(function ScreeningCard({ screening }: ScreeningCardProps) {
   const { film, cinema, datetime } = screening;
@@ -79,10 +81,7 @@ export const ScreeningCard = memo(function ScreeningCard({ screening }: Screenin
   const posthog = usePostHog();
 
   // Performance: Use selectors to only subscribe to this specific film's status
-  // This prevents all cards from re-rendering when any status changes
-  const filmId = film.id;
-  const rawStatus = useFilmStatus((state) => state.films[filmId]?.status ?? null);
-  const setStatus = useFilmStatus((state) => state.setStatus);
+  const rawStatus = useFilmStatus((state) => state.films[film.id]?.status ?? null);
 
   // Check if repertory filter is active - if so, don't show "rep" badge (redundant)
   const isRepertoryFilterActive = useFilters((state) => state.programmingTypes.includes("repertory"));
@@ -93,7 +92,7 @@ export const ScreeningCard = memo(function ScreeningCard({ screening }: Screenin
   const prefetch = usePrefetch(`/film/${film.id}`);
 
   // Track screening card clicks
-  const trackCardClick = () => {
+  function trackCardClick(): void {
     posthog.capture("screening_card_clicked", {
       film_id: film.id,
       film_title: film.title,
@@ -104,43 +103,10 @@ export const ScreeningCard = memo(function ScreeningCard({ screening }: Screenin
       screening_time: datetime,
       is_repertory: film.isRepertory,
     });
-  };
+  }
 
   // Apply mounted guard for hydration safety (localStorage not available during SSR)
   const status = mounted ? rawStatus : null;
-
-  const handleStatusClick = (e: React.MouseEvent, newStatus: FilmStatus) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Toggle off if already set to this status
-    if (status === newStatus) {
-      posthog.capture("film_status_removed", {
-        film_id: film.id,
-        film_title: film.title,
-        previous_status: newStatus,
-      });
-      setStatus(film.id, null);
-      return;
-    }
-
-    // Track status change
-    posthog.capture("film_status_set", {
-      film_id: film.id,
-      film_title: film.title,
-      status: newStatus,
-      cinema_id: cinema.id,
-      cinema_name: cinema.name,
-    });
-
-    // Always pass film metadata so it can be displayed in settings/lists
-    setStatus(film.id, newStatus, {
-      title: film.title,
-      year: film.year,
-      directors: film.directors,
-      posterUrl: film.posterUrl,
-    });
-  };
 
   return (
     <article
@@ -194,61 +160,24 @@ export const ScreeningCard = memo(function ScreeningCard({ screening }: Screenin
 
         {/* Status buttons - outside aria-hidden Link for accessibility */}
         {mounted && (
-          <div className={cn(
-            "absolute top-2 left-2 z-10 flex flex-col gap-1",
-            "opacity-0 group-hover:opacity-100 transition-opacity duration-200",
-            // Always show if a status is set
-            status && "opacity-100"
-          )}>
-            <button
-              onClick={(e) => handleStatusClick(e, "want_to_see")}
-              className={cn(
-                "w-7 h-7 flex items-center justify-center rounded-full transition-all shadow-sm",
-                status === "want_to_see"
-                  ? "bg-accent-danger text-white"
-                  : "bg-black/60 text-white/80 hover:bg-accent-danger hover:text-white"
-              )}
-              aria-label={status === "want_to_see" ? "Remove from watchlist" : "Add to watchlist"}
-            >
-              <Heart className={cn("w-3.5 h-3.5", status === "want_to_see" && "fill-current")} />
-            </button>
-            <button
-              onClick={(e) => handleStatusClick(e, "not_interested")}
-              className={cn(
-                "w-7 h-7 flex items-center justify-center rounded-full transition-all shadow-sm",
-                status === "not_interested"
-                  ? "bg-neutral-700 text-white"
-                  : "bg-black/60 text-white/80 hover:bg-neutral-600 hover:text-white"
-              )}
-              aria-label={status === "not_interested" ? "Show this film again" : "Not interested in this film"}
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <FilmStatusButtons
+            filmId={film.id}
+            filmData={{
+              title: film.title,
+              year: film.year,
+              directors: film.directors,
+              posterUrl: film.posterUrl,
+            }}
+            status={status}
+            analyticsContext={{
+              cinema_id: cinema.id,
+              cinema_name: cinema.name,
+            }}
+          />
         )}
 
-        {/* Availability badge - shows sold out or low availability */}
-        {screening.availabilityStatus === "sold_out" && (
-          <div className="absolute top-3 right-3 z-10">
-            <span className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded bg-accent-danger/90 text-white backdrop-blur-sm">
-              Sold Out
-            </span>
-          </div>
-        )}
-        {screening.availabilityStatus === "low" && (
-          <div className="absolute top-3 right-3 z-10">
-            <span className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded bg-amber-500/90 text-white backdrop-blur-sm">
-              Low Availability
-            </span>
-          </div>
-        )}
-        {screening.availabilityStatus === "returns" && (
-          <div className="absolute top-3 right-3 z-10">
-            <span className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded bg-accent-gold/90 text-black backdrop-blur-sm">
-              Returns Only
-            </span>
-          </div>
-        )}
+        {/* Availability badge */}
+        <AvailabilityBadge status={screening.availabilityStatus ?? null} />
       </div>
 
       {/* Content - Compact below poster */}
