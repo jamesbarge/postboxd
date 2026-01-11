@@ -635,9 +635,14 @@ function DateFilter({ mounted }: { mounted: boolean; fullWidth?: boolean }) {
             {/* Custom Time Toggle */}
             <button
               onClick={() => setShowTimeCustom(!showTimeCustom)}
-              className="text-xs text-text-tertiary hover:text-text-secondary transition-colors"
+              className={cn(
+                "mt-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
+                showTimeCustom
+                  ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
+                  : "border-border-default bg-background-secondary text-text-secondary hover:border-border-emphasis hover:text-text-primary"
+              )}
             >
-              {showTimeCustom ? "Hide custom" : "Custom time range..."}
+              {showTimeCustom ? "Hide custom range" : "Set custom range"}
             </button>
 
             {/* Custom Time Inputs */}
