@@ -167,14 +167,6 @@ export const TableView = memo(function TableView({ screenings }: TableViewProps)
               onSort={handleSort}
             />
             <SortableHeader
-              column="rating"
-              label="Rating"
-              currentColumn={sortColumn}
-              direction={sortDirection}
-              onSort={handleSort}
-              className="w-16 sm:w-20"
-            />
-            <SortableHeader
               column="cinema"
               label="Cinema"
               currentColumn={sortColumn}
@@ -188,6 +180,14 @@ export const TableView = memo(function TableView({ screenings }: TableViewProps)
               direction={sortDirection}
               onSort={handleSort}
               className="hidden sm:table-cell"
+            />
+            <SortableHeader
+              column="rating"
+              label="Rating"
+              currentColumn={sortColumn}
+              direction={sortDirection}
+              onSort={handleSort}
+              className="w-16 sm:w-20"
             />
           </tr>
         </thead>
@@ -305,18 +305,6 @@ const TableRow = memo(function TableRow({ row, isExpanded, onToggleExpand }: Tab
           </div>
         </td>
 
-        {/* Letterboxd Rating */}
-        <td className="table-view-rating">
-          {rating ? (
-            <span className="inline-flex items-center gap-0.5">
-              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-              <span>{rating.toFixed(1)}</span>
-            </span>
-          ) : (
-            <span className="text-text-tertiary">—</span>
-          )}
-        </td>
-
         {/* Cinema */}
         <td className="table-view-cinema">
           {cinemaDisplay}
@@ -330,6 +318,18 @@ const TableRow = memo(function TableRow({ row, isExpanded, onToggleExpand }: Tab
           <span className="whitespace-nowrap">{showingText}</span>
           {row.screeningCount > 1 && (
             <span className="text-text-tertiary ml-1">({row.screeningCount})</span>
+          )}
+        </td>
+
+        {/* Letterboxd Rating */}
+        <td className="table-view-rating">
+          {rating ? (
+            <span className="inline-flex items-center gap-0.5">
+              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+              <span>{rating.toFixed(1)}</span>
+            </span>
+          ) : (
+            <span className="text-text-tertiary">—</span>
           )}
         </td>
       </tr>
