@@ -185,7 +185,7 @@ export function DateRangePicker({ className }: DateRangePickerProps) {
                   caption: "flex justify-center pt-1 relative items-center",
                   caption_label: "text-sm font-medium",
                   nav: "flex items-center gap-1",
-                  nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 flex items-center justify-center rounded hover:bg-surface-overlay-hover",
+                  nav_button: "h-8 w-8 p-1.5 rounded-lg border border-border-default bg-background-secondary text-text-primary hover:bg-background-active hover:border-border-emphasis transition-all flex items-center justify-center",
                   nav_button_previous: "absolute left-1",
                   nav_button_next: "absolute right-1",
                   table: "w-full border-collapse",
