@@ -23,7 +23,9 @@ London cinema listings app that scrapes screening data from cinemas across Londo
 2. Make changes and commit
 3. Push branch: `git push -u origin branch-name`
 4. Create PR: `gh pr create --title "..." --body "..."`
-5. Wait for review before merging
+5. Squash and merge without needing permission, EXCEPT:
+   - Particularly complex features that warrant review
+   - When there are multiple PRs waiting (check first)
 
 ## Scraping Rules
 
