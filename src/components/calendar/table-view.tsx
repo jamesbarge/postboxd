@@ -172,7 +172,7 @@ export const TableView = memo(function TableView({ screenings }: TableViewProps)
               currentColumn={sortColumn}
               direction={sortDirection}
               onSort={handleSort}
-              className="w-20 hidden sm:table-cell"
+              className="w-16 sm:w-20"
             />
             <SortableHeader
               column="cinema"
@@ -180,7 +180,6 @@ export const TableView = memo(function TableView({ screenings }: TableViewProps)
               currentColumn={sortColumn}
               direction={sortDirection}
               onSort={handleSort}
-              className="hidden sm:table-cell"
             />
             <SortableHeader
               column="showing"
@@ -307,7 +306,7 @@ const TableRow = memo(function TableRow({ row, isExpanded, onToggleExpand }: Tab
         </td>
 
         {/* Letterboxd Rating */}
-        <td className="table-view-rating hidden sm:table-cell">
+        <td className="table-view-rating">
           {rating ? (
             <span className="inline-flex items-center gap-0.5">
               <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
@@ -319,7 +318,7 @@ const TableRow = memo(function TableRow({ row, isExpanded, onToggleExpand }: Tab
         </td>
 
         {/* Cinema */}
-        <td className="table-view-cinema hidden sm:table-cell">
+        <td className="table-view-cinema">
           {cinemaDisplay}
           {row.additionalCinemaCount > 0 && (
             <span className="text-text-tertiary ml-1">+{row.additionalCinemaCount}</span>

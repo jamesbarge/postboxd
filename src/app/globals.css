@@ -690,30 +690,26 @@ body,
 
 /* Cinema column - compact */
 .table-view-cinema {
-  @apply text-text-secondary text-sm whitespace-nowrap;
+  @apply text-text-secondary text-sm;
 }
 
 /* Showing column - compact */
 .table-view-showing {
-  @apply text-text-secondary text-sm;
+  @apply text-text-secondary text-sm whitespace-nowrap;
 }
 
-/* Mobile: sticky first column */
+/* Mobile: constrain column widths */
 @media (max-width: 640px) {
-  .table-view-row td:first-child {
-    @apply sticky left-0 bg-background-primary z-10;
+  .table-view-film {
+    @apply max-w-[140px];
   }
 
-  .table-view-row:hover td:first-child {
-    @apply bg-background-secondary;
+  .table-view-film a {
+    @apply block truncate;
   }
 
-  .table-view-row-expanded td:first-child {
-    @apply bg-background-secondary/30;
-  }
-
-  .table-view-header th:first-child {
-    @apply sticky left-0 bg-background-primary z-10;
+  .table-view-cinema {
+    @apply max-w-[80px] truncate;
   }
 }
 
