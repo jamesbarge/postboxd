@@ -14,6 +14,7 @@ import {
   BarChart3,
   Bot,
   ChevronLeft,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -48,6 +49,12 @@ const navItems: NavItem[] = [
     label: "Cinemas",
     icon: <Building2 className="w-5 h-5" />,
     description: "Cinema configuration and tiers",
+  },
+  {
+    href: "/admin/festivals",
+    label: "Festivals",
+    icon: <Calendar className="w-5 h-5" />,
+    description: "Programme status and scraping",
   },
   {
     href: "/admin/anomalies",

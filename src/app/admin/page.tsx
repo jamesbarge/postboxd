@@ -5,8 +5,8 @@
  */
 
 import { db } from "@/db";
-import { cinemas, screenings, films } from "@/db/schema";
-import { eq, gte, count, and, sql, countDistinct, lte } from "drizzle-orm";
+import { cinemas, screenings, films, festivals, festivalScreenings } from "@/db/schema";
+import { eq, gte, count, and, sql, countDistinct, lte, asc } from "drizzle-orm";
 import { subDays, startOfDay, endOfDay, format, subWeeks, isSameDay } from "date-fns";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import {
@@ -17,6 +17,7 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
@@ -169,6 +170,52 @@ export default async function AdminDashboard() {
     .from(screenings)
     .where(gte(screenings.datetime, now));
 
+  // Check for festivals needing attention
+  const activeFestivals = await db
+    .select({
+      id: festivals.id,
+      name: festivals.name,
+      slug: festivals.slug,
+      startDate: festivals.startDate,
+      endDate: festivals.endDate,
+    })
+    .from(festivals)
+    .where(
+      and(
+        eq(festivals.isActive, true),
+        gte(festivals.endDate, format(now, "yyyy-MM-dd"))
+      )
+    )
+    .orderBy(asc(festivals.startDate));
+
+  // Get screening counts per festival
+  const festivalCounts = await db
+    .select({
+      festivalId: festivalScreenings.festivalId,
+      count: count(festivalScreenings.screeningId),
+    })
+    .from(festivalScreenings)
+    .groupBy(festivalScreenings.festivalId);
+
+  const festivalCountMap = new Map(festivalCounts.map((f) => [f.festivalId, f.count]));
+
+  // Find festivals that are currently running or soon, with no screenings
+  const festivalsNeedingAttention = activeFestivals.filter((f) => {
+    const startDate = new Date(f.startDate);
+    const endDate = new Date(f.endDate);
+    const screeningCount = festivalCountMap.get(f.id) || 0;
+    const isRunning = now >= startDate && now <= endDate;
+    const startsWithinWeek = startDate > now && startDate <= subDays(now, -7);
+
+    return screeningCount === 0 && (isRunning || startsWithinWeek);
+  });
+
+  const runningFestivalsNeedingScraping = festivalsNeedingAttention.filter((f) => {
+    const startDate = new Date(f.startDate);
+    const endDate = new Date(f.endDate);
+    return now >= startDate && now <= endDate;
+  });
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -178,6 +225,26 @@ export default async function AdminDashboard() {
           Monitor cinema status and scraper health. Last checked: {format(now, "HH:mm")}
         </p>
       </div>
+
+      {/* Festival Alert Banner */}
+      {runningFestivalsNeedingScraping.length > 0 && (
+        <Link href="/admin/festivals">
+          <Card className="border-l-4 border-l-red-500 bg-red-500/5 hover:bg-red-500/10 transition-colors cursor-pointer">
+            <div className="p-4 flex items-center gap-4">
+              <Calendar className="w-6 h-6 text-red-500 shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-text-primary">
+                  Festival Running Without Programme Data
+                </p>
+                <p className="text-sm text-text-secondary">
+                  {runningFestivalsNeedingScraping.map((f) => f.name).join(", ")} needs scraping
+                </p>
+              </div>
+              <span className="text-sm text-accent-primary">View Festivals →</span>
+            </div>
+          </Card>
+        </Link>
+      )}
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -232,6 +299,12 @@ export default async function AdminDashboard() {
               icon={<AlertTriangle className="w-4 h-4" />}
               label="View Anomalies"
               variant={errorCinemas > 0 ? "warning" : "default"}
+            />
+            <ActionButton
+              href="/admin/festivals"
+              icon={<Calendar className="w-4 h-4" />}
+              label="Festival Programmes"
+              variant={runningFestivalsNeedingScraping.length > 0 ? "warning" : "default"}
             />
           </div>
         </CardContent>
