@@ -12,13 +12,10 @@ import * as schema from "./schema";
 // Connection string from Supabase
 const connectionString = process.env.DATABASE_URL;
 
-if (!connectionString) {
-  throw new Error("DATABASE_URL environment variable is not set");
-}
-
 // Create postgres client
 // For serverless environments, we use connection pooling
-const client = postgres(connectionString, {
+// Fallback to dummy string if env (e.g. build time) is missing to prevent crash
+const client = postgres(connectionString || "postgres://localhost:5432/postgres", {
   prepare: false, // Required for Supabase connection pooling (transaction mode)
   max: 1, // Limit connections in serverless
 });
