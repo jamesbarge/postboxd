@@ -566,6 +566,7 @@ function DateFilter({ mounted }: { mounted: boolean; fullWidth?: boolean }) {
             {/* Calendar */}
             <DayPicker
               mode="single"
+              weekStartsOn={1}
               selected={dateFrom || undefined}
               onSelect={handleDaySelect}
               defaultMonth={dateFrom || today}

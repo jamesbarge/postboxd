@@ -172,6 +172,7 @@ export function DateRangePicker({ className }: DateRangePickerProps) {
             <div className="p-4">
               <DayPicker
                 mode="range"
+                weekStartsOn={1}
                 selected={{ from: dateFrom || undefined, to: dateTo || undefined }}
                 onSelect={handleRangeSelect}
                 numberOfMonths={1}
