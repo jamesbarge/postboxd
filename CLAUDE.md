@@ -5,6 +5,10 @@ London cinema listings app that scrapes screening data from cinemas across Londo
 
 **Production URL: https://pictures.london**
 
+## General Principles
+
+- **Always think about a way to verify your work before starting any work.** Before implementing changes, identify how you'll confirm the change works correctly (run tests, check database values, verify in browser, etc.).
+
 ## Git Workflow
 
 ### Branch Strategy
@@ -270,3 +274,5 @@ npm run test:e2e:ui    # Playwright UI mode (debugging)
 - Integration tests that need a database should use `DATABASE_URL_TEST` environment variable
 - Test database is a separate Supabase project to avoid polluting production data
 - Each test should clean up its own data or use isolated test fixtures
+
+@AGENTS.md
