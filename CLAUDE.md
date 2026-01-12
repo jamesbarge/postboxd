@@ -85,8 +85,7 @@ London cinema listings app that scrapes screening data from cinemas across Londo
 
 ### Time Display
 - Display times in 24-hour format (e.g., "14:15") for clarity
-- Never show screenings that have already started
-- Filter is applied server-side in queries, not just client-side
+- Past screening filtering is handled server-side (see Database Rules > Screening Filtering)
 
 ## Tech Stack
 - Next.js 16 with App Router
@@ -94,9 +93,6 @@ London cinema listings app that scrapes screening data from cinemas across Londo
 - Playwright for JS-heavy sites (Curzon, BFI, Everyman)
 - Cheerio for static HTML parsing
 - date-fns for date manipulation
-
-## Database Provider - IMPORTANT
-**We use Supabase, NOT Neon.** The database is hosted on Supabase with a PostgreSQL connection string. All database operations go through Drizzle ORM connecting to Supabase.
 
 ## Authentication
 - **Clerk** for user authentication (`@clerk/nextjs`)
