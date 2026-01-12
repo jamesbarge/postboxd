@@ -1,6 +1,9 @@
 ## Project Overview
 London cinema calendar app (Pictures) that scrapes screening data from cinemas across London and displays it in a unified calendar view. We cover all cinemas with a special focus on independent venues. Production: https://pictures.london
 
+## General Principles
+- **Always think about a way to verify your work before starting any work.** Identify how you'll confirm changes work correctly (run tests, check database values, verify in browser, etc.).
+
 ## Tech Stack
 - Next.js 16 App Router, React 19
 - Drizzle ORM with PostgreSQL on Supabase (not Neon)
@@ -37,3 +40,7 @@ London cinema calendar app (Pictures) that scrapes screening data from cinemas a
 
 ## Data Quality Agents
 - Run via `npm run agents` or `agents:links`, `agents:health`, `agents:enrich`.
+
+# Agent Rules <!-- tessl-managed -->
+
+@.tessl/RULES.md follow the [instructions](.tessl/RULES.md)
