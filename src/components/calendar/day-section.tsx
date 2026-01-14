@@ -7,9 +7,10 @@
 "use client";
 
 import { useMemo, memo } from "react";
-import { format, isToday, isTomorrow, isThisWeek } from "date-fns";
+import { format } from "date-fns";
 import { ScreeningCard } from "./screening-card";
 import { FilmCard } from "./film-card";
+import { useSafeDateLabels } from "@/hooks/useSafeDateLabels";
 
 interface FilmGroup {
   film: {
@@ -61,20 +62,29 @@ interface DaySectionProps {
   viewMode: "films" | "screenings";
 }
 
-function formatDateHeader(date: Date): { primary: string; secondary: string } {
-  if (isToday(date)) {
+interface DateCheckFns {
+  isToday: (date: Date) => boolean;
+  isTomorrow: (date: Date) => boolean;
+  isThisWeek: (date: Date) => boolean;
+}
+
+function formatDateHeader(
+  date: Date,
+  checks: DateCheckFns
+): { primary: string; secondary: string } {
+  if (checks.isToday(date)) {
     return {
       primary: "Today",
       secondary: format(date, "EEEE d MMMM"),
     };
   }
-  if (isTomorrow(date)) {
+  if (checks.isTomorrow(date)) {
     return {
       primary: "Tomorrow",
       secondary: format(date, "EEEE d MMMM"),
     };
   }
-  if (isThisWeek(date)) {
+  if (checks.isThisWeek(date)) {
     return {
       primary: format(date, "EEEE"),
       secondary: format(date, "d MMMM"),
@@ -88,7 +98,13 @@ function formatDateHeader(date: Date): { primary: string; secondary: string } {
 
 // Memoize DaySection to prevent re-renders when parent updates but props haven't changed
 export const DaySection = memo(function DaySection({ date, screenings, filmGroups, viewMode }: DaySectionProps) {
-  const { primary, secondary } = formatDateHeader(date);
+  const { isClientToday, isClientTomorrow, isClientThisWeek } = useSafeDateLabels();
+
+  const { primary, secondary } = formatDateHeader(date, {
+    isToday: isClientToday,
+    isTomorrow: isClientTomorrow,
+    isThisWeek: isClientThisWeek,
+  });
 
   // Memoize sorting to prevent recalculation on every render (for screening view)
   // Primary sort: Letterboxd rating (descending), Secondary: time (ascending)
