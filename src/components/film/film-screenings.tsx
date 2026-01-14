@@ -9,14 +9,15 @@
 
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { format, isToday, isTomorrow, isSameDay, getHours, startOfDay, isWithinInterval, startOfHour, endOfDay } from "date-fns";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { format, isSameDay, getHours, startOfDay, endOfDay } from "date-fns";
 import { MapPin, ExternalLink, Search, Filter } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { usePostHog } from "posthog-js/react";
 import { ScreeningFilters, type FilmScreeningFilters } from "./screening-filters";
 import { EmptyState } from "@/components/ui";
 import { useFilters } from "@/stores/filters";
+import { useSafeDateLabels } from "@/hooks/useSafeDateLabels";
 
 interface Screening {
   id: string;
@@ -56,9 +57,12 @@ const eventTypeBadges: Record<string, { label: string; className: string }> = {
   discussion: { label: "Discussion", className: "bg-accent-primary/20 text-accent-primary" },
 };
 
-function formatScreeningDate(date: Date): string {
-  if (isToday(date)) return "Today";
-  if (isTomorrow(date)) return "Tomorrow";
+function formatScreeningDate(
+  date: Date,
+  checks: { isToday: (d: Date) => boolean; isTomorrow: (d: Date) => boolean }
+): string {
+  if (checks.isToday(date)) return "Today";
+  if (checks.isTomorrow(date)) return "Tomorrow";
   return format(date, "EEE d MMM");
 }
 
@@ -67,6 +71,13 @@ const FILTER_THRESHOLD = 5;
 
 export function FilmScreenings({ screenings, film }: FilmScreeningsProps) {
   const posthog = usePostHog();
+  const { isClientToday, isClientTomorrow } = useSafeDateLabels();
+
+  // SSR-safe date formatter - only shows "Today/Tomorrow" after hydration
+  const safeFormatScreeningDate = useCallback(
+    (date: Date) => formatScreeningDate(date, { isToday: isClientToday, isTomorrow: isClientTomorrow }),
+    [isClientToday, isClientTomorrow]
+  );
 
   // Read global filters from homepage
   const globalFilters = useFilters();
@@ -367,7 +378,7 @@ export function FilmScreenings({ screenings, film }: FilmScreeningsProps) {
                       {/* Date & Time */}
                       <div className="w-28 shrink-0">
                         <div className="text-text-primary font-medium">
-                          {formatScreeningDate(new Date(screening.datetime))}
+                          {safeFormatScreeningDate(new Date(screening.datetime))}
                         </div>
                         <div className="text-accent-highlight font-mono text-lg font-semibold">
                           {format(new Date(screening.datetime), "HH:mm")}

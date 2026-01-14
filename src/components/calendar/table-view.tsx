@@ -7,10 +7,11 @@
 "use client";
 
 import { useMemo, useState, useCallback, memo } from "react";
-import { format, differenceInDays, startOfDay, isSameDay } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { ChevronUp, ChevronDown, ChevronRight, Star, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { useSafeDateLabels } from "@/hooks/useSafeDateLabels";
 
 interface Screening {
   id: string;
@@ -269,14 +270,18 @@ function SortableHeader({ column, label, currentColumn, direction, onSort, class
 }
 
 // Format the "Showing" dates in a compact way
-function formatShowingDates(firstDate: Date, lastDate: Date, uniqueDates: Date[]): string {
-  const today = startOfDay(new Date());
-  const isToday = isSameDay(firstDate, today);
+function formatShowingDates(
+  firstDate: Date,
+  lastDate: Date,
+  uniqueDates: Date[],
+  isClientToday: (date: Date) => boolean
+): string {
+  const isTodayResult = isClientToday(firstDate);
   const daySpan = differenceInDays(lastDate, firstDate);
 
   if (uniqueDates.length === 1) {
     // Single date
-    return isToday ? "Today" : format(firstDate, "EEE d");
+    return isTodayResult ? "Today" : format(firstDate, "EEE d");
   }
 
   if (daySpan <= 6) {
@@ -297,8 +302,9 @@ interface TableRowProps {
 }
 
 const TableRow = memo(function TableRow({ row, isExpanded, onToggleExpand, ratingsHidden }: TableRowProps) {
+  const { isClientToday } = useSafeDateLabels();
   const cinemaDisplay = row.primaryCinema.shortName || row.primaryCinema.name;
-  const showingText = formatShowingDates(row.firstDate, row.lastDate, row.uniqueDates);
+  const showingText = formatShowingDates(row.firstDate, row.lastDate, row.uniqueDates, isClientToday);
   const rating = row.film.letterboxdRating;
 
   return (

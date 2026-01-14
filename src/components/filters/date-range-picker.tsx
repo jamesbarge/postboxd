@@ -7,10 +7,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import { DayPicker, DateRange } from "react-day-picker";
-import { format, startOfDay, addDays, isSameDay, isToday, isTomorrow } from "date-fns";
+import { format, startOfDay, addDays, isSameDay } from "date-fns";
 import { Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useFilters } from "@/stores/filters";
+import { useSafeDateLabels } from "@/hooks/useSafeDateLabels";
 
 interface DateRangePickerProps {
   className?: string;
@@ -19,14 +20,8 @@ interface DateRangePickerProps {
 export function DateRangePicker({ className }: DateRangePickerProps) {
   const { dateFrom, dateTo, setDateRange } = useFilters();
   const [isOpen, setIsOpen] = useState(false);
-  const [mounted, setMounted] = useState(() => typeof window !== "undefined");
+  const { isClientToday, isClientTomorrow, hydrated } = useSafeDateLabels();
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // Ensure mounted updates after hydration
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Standard hydration pattern
-    if (!mounted) setMounted(true);
-  }, [mounted]);
 
   // Close on click outside
   useEffect(() => {
@@ -85,13 +80,13 @@ export function DateRangePicker({ className }: DateRangePickerProps) {
 
   // Format the button label
   const getButtonLabel = () => {
-    if (!mounted) return "All Dates";
+    if (!hydrated) return "All Dates";
     if (!dateFrom && !dateTo) return "All Dates";
 
     if (dateFrom && dateTo) {
       if (isSameDay(dateFrom, dateTo)) {
-        if (isToday(dateFrom)) return "Today";
-        if (isTomorrow(dateFrom)) return "Tomorrow";
+        if (isClientToday(dateFrom)) return "Today";
+        if (isClientTomorrow(dateFrom)) return "Tomorrow";
         return format(dateFrom, "d MMM");
       }
       return `${format(dateFrom, "d MMM")} – ${format(dateTo, "d MMM")}`;
@@ -104,7 +99,7 @@ export function DateRangePicker({ className }: DateRangePickerProps) {
     return "All Dates";
   };
 
-  const hasSelection = mounted && (dateFrom || dateTo);
+  const hasSelection = hydrated && (dateFrom || dateTo);
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
