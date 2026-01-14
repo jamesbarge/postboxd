@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { db, isDatabaseAvailable } from "@/db";
 import { screenings, films, cinemas, festivals, seasons } from "@/db/schema";
 import { eq, gte, lte, and, countDistinct, count } from "drizzle-orm";
 import { endOfDay, addDays, startOfDay, format } from "date-fns";
@@ -130,6 +130,23 @@ const getCachedStats = unstable_cache(
 export default async function Home() {
   // Use date key to bust cache at midnight (ensures fresh data each day)
   const dateKey = format(new Date(), "yyyy-MM-dd");
+
+  // Early return with fallback data if no database (CI/test environments)
+  if (!isDatabaseAvailable) {
+    return (
+      <div className="min-h-screen bg-background-primary">
+        <WebSiteSchema />
+        <Header cinemas={[]} festivals={[]} seasons={[]} availableFormats={[]} />
+        <main className="px-4 sm:px-6 lg:px-8 py-6">
+          <div className="p-6 bg-background-secondary/50 border border-border-subtle rounded-lg text-center">
+            <p className="text-text-secondary">
+              Database not available. This is expected in CI/test environments.
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   // Fetch cached data (60s cache for screenings, 1hr for cinemas/seasons, 5min for stats)
   const [initialScreenings, allCinemas, activeFestivals, activeSeasons, stats] = await Promise.all([
