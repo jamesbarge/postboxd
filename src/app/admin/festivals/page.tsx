@@ -5,8 +5,8 @@
 
 import { db } from "@/db";
 import { festivals, festivalScreenings } from "@/db/schema";
-import { eq, gte, lte, and, sql, count, asc } from "drizzle-orm";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { eq, count, asc } from "drizzle-orm";
+import { Card } from "@/components/ui/card";
 import {
   CheckCircle,
   AlertTriangle,

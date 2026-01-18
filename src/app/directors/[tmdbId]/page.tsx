@@ -12,9 +12,7 @@ import {
   ChevronLeft,
   Calendar,
   MapPin,
-  ExternalLink,
   Film,
-  Clock,
 } from "lucide-react";
 import { db } from "@/db";
 import { seasons, seasonFilms, films, screenings } from "@/db/schema";
@@ -207,7 +205,7 @@ export default async function DirectorPage({ params }: DirectorPageProps) {
 
             {/* Info */}
             <div className="flex-1">
-              <h1 className="text-3xl font-display text-text-primary mb-2">
+              <h1 className="text-3xl font-display text-text-primary mb-2 text-balance">
                 {directorName}
               </h1>
 
@@ -250,7 +248,7 @@ export default async function DirectorPage({ params }: DirectorPageProps) {
           {/* Biography */}
           {tmdbData?.details.biography && (
             <div className="mt-6">
-              <p className="text-text-secondary text-sm leading-relaxed line-clamp-4">
+              <p className="text-text-secondary text-sm leading-relaxed line-clamp-4 text-pretty">
                 {tmdbData.details.biography}
               </p>
             </div>

@@ -11,7 +11,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X, Check } from "lucide-react";
-import { cn } from "@/lib/cn";
 
 interface DismissButtonProps {
   cinemaId: string;

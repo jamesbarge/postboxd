@@ -127,12 +127,12 @@ export default async function AboutPage() {
       {/* Content */}
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
-        <h1 className="text-3xl font-display text-text-primary mb-4">
+        <h1 className="text-3xl font-display text-text-primary mb-4 text-balance">
           About Pictures
         </h1>
 
         {/* Answer-first summary */}
-        <p className="text-lg text-text-secondary mb-8">
+        <p className="text-lg text-text-secondary mb-8 text-pretty">
           Pictures provides the definitive cinema listings for London cinephiles. We
           aggregate listings from {stats.cinemaCount} cinemas into
           one unified view, helping you discover screenings you might otherwise

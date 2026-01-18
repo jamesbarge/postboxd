@@ -87,10 +87,10 @@ export default async function WatchlistPage() {
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-display text-text-primary mb-2">
+        <h1 className="text-3xl font-display text-text-primary mb-2 text-balance">
           Watchlist
         </h1>
-        <p className="text-text-secondary mb-8">
+        <p className="text-text-secondary mb-8 text-pretty">
           Films you want to see on the big screen
         </p>
 

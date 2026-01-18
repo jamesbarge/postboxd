@@ -13,7 +13,6 @@ import { z } from "zod";
 import {
   BadRequestError,
   NotFoundError,
-  UnauthorizedError,
   handleApiError,
 } from "@/lib/api-errors";
 import { requireAuth } from "@/lib/auth";

@@ -18,19 +18,10 @@ import {
   getCinemaEngagement,
 } from "@/lib/posthog-api";
 
-// Admin email check (server-side)
-function isAdmin(email: string | undefined): boolean {
-  if (!email) return false;
-  return ADMIN_EMAILS.includes(email.toLowerCase());
-}
-
 export async function GET(request: NextRequest) {
   try {
     // Require authentication
-    const userId = await requireAuth();
-
-    // For now, we'll trust the auth - in production you'd verify admin status
-    // via Clerk's user metadata or a database lookup
+    await requireAuth();
 
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get("type") || "summary";

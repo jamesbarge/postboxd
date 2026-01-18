@@ -9,8 +9,8 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft, Film, Calendar } from "lucide-react";
 import { db } from "@/db";
-import { seasons, seasonFilms } from "@/db/schema";
-import { eq, isNotNull, count, sql, desc } from "drizzle-orm";
+import { seasons } from "@/db/schema";
+import { isNotNull, count, sql, desc } from "drizzle-orm";
 import { getTMDBClient, TMDBClient } from "@/lib/tmdb";
 import { ItemListSchema, BreadcrumbSchema } from "@/components/seo/json-ld";
 
@@ -140,7 +140,7 @@ export default async function DirectorsPage() {
             <span className="text-text-primary">Directors</span>
           </nav>
 
-          <h1 className="text-3xl font-display text-text-primary mb-2">
+          <h1 className="text-3xl font-display text-text-primary mb-2 text-balance">
             Directors
           </h1>
           <p className="text-text-secondary">

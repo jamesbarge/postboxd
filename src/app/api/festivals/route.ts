@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { festivals, userFestivalInterests } from "@/db/schema";
-import { eq, and, gte, lte, desc, asc, sql } from "drizzle-orm";
+import { eq, and, gte, asc, sql } from "drizzle-orm";
 import { z } from "zod";
 import { BadRequestError, handleApiError } from "@/lib/api-errors";
 import { getCurrentUserId } from "@/lib/auth";

@@ -12,7 +12,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db";
 import { cinemas, screenings } from "@/db/schema";
 import { eq, gte, lte, count, and } from "drizzle-orm";
-import { startOfDay, endOfDay, subDays, format } from "date-fns";
+import { endOfDay, subDays, format } from "date-fns";
 
 const anthropic = new Anthropic();
 

@@ -9,7 +9,7 @@ import Link from "next/link";
 import { MapPin, ExternalLink, Film } from "lucide-react";
 import { db } from "@/db";
 import { cinemas, screenings } from "@/db/schema";
-import { eq, gte, count, and, sql } from "drizzle-orm";
+import { eq, gte, count, and } from "drizzle-orm";
 import {
   ItemListSchema,
   FAQSchema,

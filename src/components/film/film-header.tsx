@@ -153,7 +153,7 @@ export function FilmHeader({ film }: FilmHeaderProps) {
             {/* Info */}
             <div className="flex-1 text-center sm:text-left">
               {/* Title */}
-              <h1 className="font-display text-3xl sm:text-4xl text-text-primary">
+              <h1 className="font-display text-3xl sm:text-4xl text-text-primary text-balance">
                 {film.title}
               </h1>
               {film.originalTitle && film.originalTitle !== film.title && (
@@ -265,7 +265,7 @@ export function FilmHeader({ film }: FilmHeaderProps) {
               <h2 className="text-sm font-medium text-text-tertiary uppercase tracking-wider mb-2">
                 Synopsis
               </h2>
-              <p className="text-text-secondary leading-relaxed max-w-prose">
+              <p className="text-text-secondary leading-relaxed max-w-prose text-pretty">
                 {film.synopsis}
               </p>
             </div>
