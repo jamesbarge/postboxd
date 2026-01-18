@@ -14,7 +14,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-background-primary pb-24">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-background-primary/95 backdrop-blur-sm border-b border-border-subtle">
+      <div className="sticky top-0 z-50 bg-background-primary border-b border-border-subtle">
         <div className="max-w-4xl mx-auto px-4 py-3">
           <Link
             href="/"

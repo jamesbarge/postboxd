@@ -131,7 +131,7 @@ function MobileMenuDrawer({
       <div
         onTransitionEnd={handleTransitionEnd}
         className={cn(
-          "fixed top-0 right-0 h-full w-72 bg-background-primary border-l border-border-subtle z-50 sm:hidden",
+          "fixed top-0 right-0 h-dvh w-72 bg-background-primary border-l border-border-subtle z-50 sm:hidden",
           "transform transition-transform duration-200 ease-out",
           isOpen ? "translate-x-0" : "translate-x-full"
         )}
@@ -273,7 +273,10 @@ export function HeaderNavButtons({ mounted }: HeaderNavButtonsProps) {
             <>
               <SignedOut>
                 <SignInButton mode="modal">
-                  <button className="flex items-center justify-center w-8 h-8 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-background-hover">
+                  <button
+                      className="flex items-center justify-center w-8 h-8 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-background-hover"
+                      aria-label="Sign in"
+                    >
                     <User className="w-5 h-5" />
                   </button>
                 </SignInButton>
