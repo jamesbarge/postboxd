@@ -27,7 +27,7 @@ export function CookieConsentBanner() {
       role="dialog"
       aria-labelledby="cookie-consent-title"
       aria-describedby="cookie-consent-description"
-      className="fixed bottom-0 inset-x-0 z-[100] p-4 sm:p-6"
+      className="fixed bottom-0 inset-x-0 z-50 p-4 sm:p-6"
     >
       <div className="max-w-2xl mx-auto bg-background-secondary border border-border-subtle rounded-xl shadow-lg">
         <div className="p-4 sm:p-6">
