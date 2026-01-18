@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 import { db } from "@/db";
 import { festivals, userFestivalInterests } from "@/db/schema";
-import { eq, and, gte, asc, sql } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { FestivalList } from "@/components/festivals";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
@@ -152,7 +152,7 @@ export default async function FestivalsPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Page header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-display text-text-primary mb-2">
+          <h1 className="text-3xl font-display text-text-primary mb-2 text-balance">
             London Film Festivals
           </h1>
           <p className="text-text-secondary">

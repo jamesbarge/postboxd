@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { screenings, films } from "@/db/schema";
-import { lt, notInArray, sql } from "drizzle-orm";
+import { lt, notInArray } from "drizzle-orm";
 
 /**
  * Verify the request is from Vercel Cron

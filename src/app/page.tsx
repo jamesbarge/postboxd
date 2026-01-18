@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 // Cache screenings query for 60 seconds (keyed by date to bust cache at midnight)
 // Load all screenings for 3 days (~2500) - never hide films that are showing
 const getCachedScreenings = unstable_cache(
-  async (dateKey: string) => {
+  async (_dateKey: string) => {
     const now = new Date();
     const endDate = endOfDay(addDays(now, 3)); // 3 days instead of 7
 

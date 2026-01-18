@@ -179,7 +179,7 @@ export default async function FestivalPage({ params }: FestivalPageProps) {
       {/* Programme */}
       <div className="max-w-4xl mx-auto px-4 mt-10">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-display text-text-primary">
+          <h2 className="text-xl font-display text-text-primary text-balance">
             Programme
           </h2>
           {status === "ongoing" && (

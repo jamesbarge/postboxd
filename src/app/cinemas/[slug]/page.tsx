@@ -149,7 +149,7 @@ export default async function CinemaPage({ params }: CinemaPageProps) {
       <div className="bg-background-secondary border-b border-border-subtle">
         <div className="max-w-4xl mx-auto px-4 py-8">
           {/* H1 - critical for local SEO */}
-          <h1 className="text-3xl font-display text-text-primary mb-2">
+          <h1 className="text-3xl font-display text-text-primary mb-2 text-balance">
             {cinemaData.name}
           </h1>
 

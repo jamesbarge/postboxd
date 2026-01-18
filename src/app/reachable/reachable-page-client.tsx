@@ -182,10 +182,10 @@ export function ReachablePageClient({
         <div className="max-w-2xl mx-auto">
           {/* Hero / Explainer Section */}
           <div className="mb-8">
-            <h1 className="text-2xl sm:text-3xl font-display text-text-primary mb-2">
+            <h1 className="text-2xl sm:text-3xl font-display text-text-primary mb-2 text-balance">
               Find films that fit your schedule
             </h1>
-            <p className="text-text-secondary text-sm sm:text-base">
+            <p className="text-text-secondary text-sm sm:text-base text-pretty">
               Tell us where you are and when you need to be free. We&apos;ll
               calculate travel times to {cinemas.length} London cinemas and show
               you every screening you can catch.

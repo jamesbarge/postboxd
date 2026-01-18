@@ -9,8 +9,8 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft, Calendar, Film, MapPin } from "lucide-react";
 import { db } from "@/db";
-import { seasons, seasonFilms, cinemas } from "@/db/schema";
-import { eq, gte, lte, and, count, sql, desc, asc } from "drizzle-orm";
+import { seasons, seasonFilms } from "@/db/schema";
+import { eq, count, sql, desc, asc } from "drizzle-orm";
 import { format } from "date-fns";
 import { ItemListSchema, BreadcrumbSchema } from "@/components/seo/json-ld";
 
@@ -152,7 +152,7 @@ export default async function SeasonsPage() {
             <span className="text-text-primary">Seasons</span>
           </nav>
 
-          <h1 className="text-3xl font-display text-text-primary mb-2">
+          <h1 className="text-3xl font-display text-text-primary mb-2 text-balance">
             Film Seasons & Retrospectives
           </h1>
           <p className="text-text-secondary">

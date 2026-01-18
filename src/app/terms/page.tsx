@@ -44,7 +44,7 @@ export default function TermsOfServicePage() {
 
       {/* Content */}
       <div className="max-w-3xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-display text-text-primary mb-2">
+        <h1 className="text-3xl font-display text-text-primary mb-2 text-balance">
           Terms of Service
         </h1>
         <p className="text-sm text-text-tertiary mb-8">

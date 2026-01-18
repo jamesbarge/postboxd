@@ -17,7 +17,7 @@ import {
   Clock,
 } from "lucide-react";
 import { db } from "@/db";
-import { seasons, seasonFilms, films, screenings, cinemas } from "@/db/schema";
+import { seasons, seasonFilms, films, screenings } from "@/db/schema";
 import { eq, and, gte, inArray } from "drizzle-orm";
 import { format } from "date-fns";
 import { BreadcrumbSchema } from "@/components/seo/json-ld";
@@ -173,13 +173,13 @@ export default async function SeasonPage({ params }: SeasonPageProps) {
           </div>
 
           {/* Title */}
-          <h1 className="text-3xl font-display text-text-primary mb-2">
+          <h1 className="text-3xl font-display text-text-primary mb-2 text-balance">
             {season.name}
           </h1>
 
           {/* Director */}
           {season.directorName && (
-            <p className="text-lg text-text-secondary mb-4">
+            <p className="text-lg text-text-secondary mb-4 text-pretty">
               A retrospective of films by {season.directorName}
             </p>
           )}

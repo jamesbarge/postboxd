@@ -57,7 +57,7 @@ const CINEMA_TO_SCRAPER: Record<string, string> = {
   "everyman-belsize-park": "everyman",
 };
 
-export async function POST(request: Request) {
+export async function POST() {
   // Verify admin auth
   const { userId } = await auth();
   if (!userId) {

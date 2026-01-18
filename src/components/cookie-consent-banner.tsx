@@ -39,7 +39,7 @@ export function CookieConsentBanner() {
             <div className="flex-1">
               <h2
                 id="cookie-consent-title"
-                className="font-display text-lg text-text-primary"
+                className="font-display text-lg text-text-primary text-balance"
               >
                 Cookie preferences
               </h2>

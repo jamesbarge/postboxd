@@ -5,9 +5,9 @@
  */
 
 import { db } from "@/db";
-import { cinemas, screenings, films, festivals, festivalScreenings } from "@/db/schema";
-import { eq, gte, count, and, sql, countDistinct, lte, asc } from "drizzle-orm";
-import { subDays, startOfDay, endOfDay, format, subWeeks, isSameDay } from "date-fns";
+import { cinemas, screenings, festivals, festivalScreenings } from "@/db/schema";
+import { eq, gte, count, and, countDistinct, lte, asc } from "drizzle-orm";
+import { subDays, startOfDay, endOfDay, format, subWeeks } from "date-fns";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import {
   CheckCircle,

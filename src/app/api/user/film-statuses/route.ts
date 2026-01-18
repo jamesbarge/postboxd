@@ -52,8 +52,8 @@ export async function GET() {
   }
 }
 
-// Infer type from schema
-type FilmStatusPayload = z.infer<typeof filmStatusSchema>;
+// Type exported for use in other modules if needed
+export type FilmStatusPayload = z.infer<typeof filmStatusSchema>;
 
 /**
  * POST /api/user/film-statuses - Bulk upsert film statuses
