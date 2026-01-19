@@ -5,6 +5,16 @@ AI CONTEXT FILE - Keep last ~20 entries. Add new entries at top.
 When an entry is added here, also create a detailed file in /changelogs/
 -->
 
+## 2026-01-19: Add Romford Lumiere Cinema
+**Files**: `src/db/seed-cli.ts`, `src/scrapers/cinemas/romford-lumiere.ts`, `src/scrapers/run-romford-lumiere-v2.ts`, `package.json`
+- Added Lumiere Romford as a new independent cinema
+- Created Playwright-based scraper for CineSync-powered website
+- Added `romford-lumiere` cinema to seed data (4 screens, community co-operative)
+- Added `npm run scrape:romford-lumiere` command
+- Updated `scrape:independents` to include the new scraper
+
+---
+
 ## 2026-01-19: Fix Duplicate Films from Version Suffixes
 **PR**: #51 | **Files**: `src/lib/title-extractor.ts`, `src/lib/title-extractor.test.ts`, `src/scrapers/pipeline.ts`
 - Fixed duplicate film records caused by version suffixes like `: Final Cut`, `: Director's Cut`

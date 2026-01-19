@@ -254,6 +254,7 @@ npm run scrape:nickel       # The Nickel
 npm run scrape:electric     # Electric Cinema
 npm run scrape:lexi         # Lexi Cinema
 npm run scrape:garden       # Garden Cinema
+npm run scrape:romford-lumiere # Lumiere Romford (Playwright/CineSync)
 
 # Batch scrapers
 npm run scrape:chains       # All chain cinemas
