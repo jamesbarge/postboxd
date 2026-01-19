@@ -307,7 +307,7 @@ export class RomfordLumiereScraper {
   }
 
   private async parseScreeningsFromPageText(
-    $: cheerio.CheerioAPI,
+    $: ReturnType<typeof cheerio.load>,
     film: CineSyncMovieData,
     endDate: Date
   ): Promise<RawScreening[]> {
