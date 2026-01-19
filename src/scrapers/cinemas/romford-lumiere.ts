@@ -1,47 +1,70 @@
 /**
  * Romford Lumiere Scraper
  *
- * Uses Playwright to scrape the CineSync-powered Lumiere Romford website.
+ * Uses Playwright to intercept CineSync API responses from the Lumiere Romford website.
  * The site is built with Next.js and loads film/screening data dynamically
- * via the CineSync API.
+ * via the CineSync API (lumiereromford.api.cinesync.io).
  *
  * Website: https://www.lumiereromford.com
  * API: https://lumiereromford.api.cinesync.io
  *
  * Strategy:
- * 1. Use Playwright to load the "What's On" page
- * 2. Wait for dynamic content to render
- * 3. Navigate to each film to extract screening times
- * 4. Build RawScreening objects from the extracted data
+ * 1. Use Playwright to load the website
+ * 2. Intercept API responses containing film and screening data
+ * 3. Parse the JSON data directly from API responses
+ * 4. Build RawScreening objects from the captured data
  */
 
-import * as cheerio from "cheerio";
 import type { RawScreening, ScraperConfig } from "../types";
 import { getBrowser, closeBrowser, createPage } from "../utils/browser";
-import type { Page } from "playwright";
-import { addDays, parse, format } from "date-fns";
+import type { Page, Response } from "playwright";
+import { addDays, format, parse } from "date-fns";
 
-interface CineSyncMovieData {
-  movie_id: string;
-  movie_name: string;
+// CineSync API response types
+interface CineSyncMovie {
+  id: number;
+  name: string;
   url_key: string;
-  portrait_image?: string;
-  landscape_image?: string;
   runtime?: number;
   release_date?: string;
   director?: string;
+  synopsis?: string;
+  portrait_image?: string;
+  landscape_image?: string;
 }
 
-interface CineSyncShowtime {
-  session_id: string;
-  session_datetime: string; // ISO datetime
+interface CineSyncSession {
+  id: number;
+  movie_id: number;
+  screen_id: number;
   screen_name?: string;
-  format?: string;
+  session_datetime: string; // ISO datetime string
+  session_date: string; // YYYY-MM-DD
+  session_time: string; // HH:mm
   booking_url?: string;
+  sold_out?: boolean;
+  format?: string;
+}
+
+interface CineSyncScheduleResponse {
+  movies?: CineSyncMovie[];
+  sessions?: CineSyncSession[];
+  schedule?: {
+    dates?: Array<{
+      date: string;
+      movies?: Array<{
+        movie: CineSyncMovie;
+        sessions: CineSyncSession[];
+      }>;
+    }>;
+  };
 }
 
 export class RomfordLumiereScraper {
   private page: Page | null = null;
+  private capturedMovies: Map<number, CineSyncMovie> = new Map();
+  private capturedSessions: CineSyncSession[] = [];
+  private apiResponsesReceived = 0;
 
   config: ScraperConfig = {
     cinemaId: "romford-lumiere",
@@ -51,7 +74,7 @@ export class RomfordLumiereScraper {
   };
 
   async scrape(): Promise<RawScreening[]> {
-    console.log(`[${this.config.cinemaId}] Starting scrape with Playwright...`);
+    console.log(`[${this.config.cinemaId}] Starting scrape with API interception...`);
 
     try {
       await this.initialize();
@@ -73,14 +96,95 @@ export class RomfordLumiereScraper {
     await getBrowser();
     this.page = await createPage();
 
-    // Visit homepage to establish session
-    console.log(`[${this.config.cinemaId}] Warming up session...`);
-    await this.page.goto(this.config.baseUrl, {
-      waitUntil: "domcontentloaded",
-      timeout: 60000,
+    // Reset captured data
+    this.capturedMovies.clear();
+    this.capturedSessions = [];
+    this.apiResponsesReceived = 0;
+
+    // Set up response interception for CineSync API
+    this.page.on("response", async (response: Response) => {
+      await this.handleResponse(response);
     });
-    await this.page.waitForTimeout(3000);
-    console.log(`[${this.config.cinemaId}] Session established`);
+
+    console.log(`[${this.config.cinemaId}] Browser initialized with API interception`);
+  }
+
+  private async handleResponse(response: Response): Promise<void> {
+    const url = response.url();
+
+    // Only intercept CineSync API responses
+    if (!url.includes("lumiereromford.api.cinesync.io") && !url.includes("api.cinesync.io")) {
+      return;
+    }
+
+    // Skip non-JSON responses
+    const contentType = response.headers()["content-type"] || "";
+    if (!contentType.includes("application/json")) {
+      return;
+    }
+
+    try {
+      const data = await response.json();
+      this.apiResponsesReceived++;
+
+      // Log what we're capturing
+      console.log(`[${this.config.cinemaId}] Captured API response from: ${url.substring(0, 100)}...`);
+
+      // Extract movies from various response formats
+      if (data.movies && Array.isArray(data.movies)) {
+        for (const movie of data.movies) {
+          if (movie.id && movie.name) {
+            this.capturedMovies.set(movie.id, movie);
+          }
+        }
+        console.log(`[${this.config.cinemaId}] Captured ${data.movies.length} movies`);
+      }
+
+      // Extract sessions from various response formats
+      if (data.sessions && Array.isArray(data.sessions)) {
+        this.capturedSessions.push(...data.sessions);
+        console.log(`[${this.config.cinemaId}] Captured ${data.sessions.length} sessions`);
+      }
+
+      // Handle schedule format (nested movies/sessions by date)
+      if (data.schedule?.dates && Array.isArray(data.schedule.dates)) {
+        for (const dateEntry of data.schedule.dates) {
+          if (dateEntry.movies && Array.isArray(dateEntry.movies)) {
+            for (const movieEntry of dateEntry.movies) {
+              if (movieEntry.movie?.id && movieEntry.movie?.name) {
+                this.capturedMovies.set(movieEntry.movie.id, movieEntry.movie);
+              }
+              if (movieEntry.sessions && Array.isArray(movieEntry.sessions)) {
+                this.capturedSessions.push(...movieEntry.sessions);
+              }
+            }
+          }
+        }
+        console.log(`[${this.config.cinemaId}] Captured schedule data with ${data.schedule.dates.length} dates`);
+      }
+
+      // Handle data nested under "data" key
+      if (data.data) {
+        if (data.data.movies && Array.isArray(data.data.movies)) {
+          for (const movie of data.data.movies) {
+            if (movie.id && movie.name) {
+              this.capturedMovies.set(movie.id, movie);
+            }
+          }
+        }
+        if (data.data.sessions && Array.isArray(data.data.sessions)) {
+          this.capturedSessions.push(...data.data.sessions);
+        }
+      }
+
+      // Handle movie-specific responses (when viewing a single film)
+      if (data.movie && data.movie.id) {
+        this.capturedMovies.set(data.movie.id, data.movie);
+      }
+
+    } catch {
+      // Ignore JSON parse errors - some API responses might not be relevant
+    }
   }
 
   private async cleanup(): Promise<void> {
@@ -95,454 +199,153 @@ export class RomfordLumiereScraper {
   private async fetchAllScreenings(): Promise<RawScreening[]> {
     if (!this.page) throw new Error("Browser not initialized");
 
-    const allScreenings: RawScreening[] = [];
+    const endOfApril = new Date(2026, 3, 30); // April 30, 2026
 
     try {
-      // Navigate to the buy-tickets page which shows films by date
+      // Navigate to the main "What's On" page to trigger API calls
       console.log(`[${this.config.cinemaId}] Loading buy-tickets page...`);
       await this.page.goto(`${this.config.baseUrl}/en/buy-tickets`, {
         waitUntil: "networkidle",
         timeout: 60000,
       });
 
+      // Wait for API responses to be captured
       await this.page.waitForTimeout(5000);
 
-      // Try to find and click on dates to load screenings
-      // CineSync sites typically have a date picker or calendar view
-      const today = new Date();
-      const endOfApril = new Date(2026, 3, 30); // April 30, 2026
+      console.log(`[${this.config.cinemaId}] Captured ${this.apiResponsesReceived} API responses so far`);
+      console.log(`[${this.config.cinemaId}] Movies: ${this.capturedMovies.size}, Sessions: ${this.capturedSessions.length}`);
 
-      // Calculate days to scrape (until end of April)
-      const daysToScrape: Date[] = [];
-      let currentDate = today;
-      while (currentDate <= endOfApril) {
-        daysToScrape.push(new Date(currentDate));
-        currentDate = addDays(currentDate, 1);
+      // If we didn't get enough data, try navigating to more pages
+      if (this.capturedMovies.size === 0 || this.capturedSessions.length === 0) {
+        console.log(`[${this.config.cinemaId}] Trying alternative pages...`);
+
+        // Try the available-to-book page
+        await this.page.goto(`${this.config.baseUrl}/en/available-to-book`, {
+          waitUntil: "networkidle",
+          timeout: 60000,
+        });
+        await this.page.waitForTimeout(5000);
+
+        console.log(`[${this.config.cinemaId}] After available-to-book: Movies: ${this.capturedMovies.size}, Sessions: ${this.capturedSessions.length}`);
       }
 
-      console.log(`[${this.config.cinemaId}] Will scrape ${daysToScrape.length} days until end of April`);
+      // If we still don't have sessions, try clicking through dates
+      if (this.capturedSessions.length === 0) {
+        console.log(`[${this.config.cinemaId}] Trying to interact with date selectors...`);
 
-      // First, try to get the list of films from the current page
-      const films = await this.extractFilmsFromPage();
+        // Try clicking on date elements
+        const dateSelectors = [
+          'button[data-date]',
+          '[class*="date-selector"] button',
+          '[class*="calendar"] button',
+          '.date-picker button',
+        ];
 
-      if (films.length > 0) {
-        console.log(`[${this.config.cinemaId}] Found ${films.length} films on the page`);
-
-        // Navigate to each film's page to get its showtimes
-        for (const film of films) {
+        for (const selector of dateSelectors) {
           try {
-            const filmScreenings = await this.extractFilmScreenings(film, endOfApril);
-            allScreenings.push(...filmScreenings);
-            await this.page.waitForTimeout(this.config.delayBetweenRequests);
-          } catch (error) {
-            console.warn(`[${this.config.cinemaId}] Error extracting screenings for "${film.movie_name}":`, error);
+            const elements = await this.page.$$(selector);
+            if (elements.length > 0) {
+              console.log(`[${this.config.cinemaId}] Found ${elements.length} date elements with selector: ${selector}`);
+              // Click on first few dates to trigger API calls
+              for (let i = 0; i < Math.min(5, elements.length); i++) {
+                try {
+                  await elements[i].click();
+                  await this.page.waitForTimeout(2000);
+                } catch {
+                  // Ignore click errors
+                }
+              }
+              break;
+            }
+          } catch {
+            // Continue to next selector
           }
         }
-      } else {
-        // Fallback: Try to extract screenings directly from the page
-        console.log(`[${this.config.cinemaId}] No films found, attempting direct extraction...`);
-        const directScreenings = await this.extractScreeningsDirectly();
-        allScreenings.push(...directScreenings);
       }
+
+      // If we still don't have data, try the movies page
+      if (this.capturedMovies.size === 0) {
+        console.log(`[${this.config.cinemaId}] Trying movies page...`);
+        await this.page.goto(`${this.config.baseUrl}/en/movies`, {
+          waitUntil: "networkidle",
+          timeout: 60000,
+        });
+        await this.page.waitForTimeout(5000);
+
+        console.log(`[${this.config.cinemaId}] After movies page: Movies: ${this.capturedMovies.size}, Sessions: ${this.capturedSessions.length}`);
+      }
+
+      // Final summary
+      console.log(`[${this.config.cinemaId}] Final capture: ${this.capturedMovies.size} movies, ${this.capturedSessions.length} sessions`);
+
+      // Convert captured data to screenings
+      return this.convertToScreenings(endOfApril);
 
     } catch (error) {
       console.error(`[${this.config.cinemaId}] Error fetching screenings:`, error);
+      return [];
     }
-
-    return allScreenings;
   }
 
-  private async extractFilmsFromPage(): Promise<CineSyncMovieData[]> {
-    if (!this.page) return [];
-
-    const films: CineSyncMovieData[] = [];
-
-    try {
-      // Wait for film cards to appear
-      await this.page.waitForSelector('a[href*="/movies/"]', { timeout: 10000 }).catch(() => {});
-
-      // Get the page content and parse with Cheerio
-      const html = await this.page.content();
-      const $ = cheerio.load(html);
-
-      // Find all film links - CineSync sites typically have /movies/ or /en/movies/ URLs
-      const filmLinks = $('a[href*="/movies/"]');
-
-      const seenFilms = new Set<string>();
-
-      filmLinks.each((_, el) => {
-        const $el = $(el);
-        const href = $el.attr("href") || "";
-
-        // Extract the URL key from the href
-        const urlKeyMatch = href.match(/\/movies\/([^/?]+)/);
-        if (!urlKeyMatch) return;
-
-        const urlKey = urlKeyMatch[1];
-        if (seenFilms.has(urlKey)) return;
-        seenFilms.add(urlKey);
-
-        // Try to get the film name from the link text or nearby elements
-        let movieName = $el.text().trim();
-
-        // If the link has an image, try to find the title elsewhere
-        if (!movieName || movieName.length < 2) {
-          movieName = $el.attr("title") || $el.find("img").attr("alt") || "";
-        }
-
-        // Clean up the movie name
-        movieName = movieName.replace(/\s+/g, " ").trim();
-
-        if (movieName && movieName.length > 1) {
-          films.push({
-            movie_id: urlKey,
-            movie_name: movieName,
-            url_key: urlKey,
-          });
-        }
-      });
-
-      console.log(`[${this.config.cinemaId}] Extracted ${films.length} films from page`);
-    } catch (error) {
-      console.warn(`[${this.config.cinemaId}] Error extracting films:`, error);
-    }
-
-    return films;
-  }
-
-  private async extractFilmScreenings(
-    film: CineSyncMovieData,
-    endDate: Date
-  ): Promise<RawScreening[]> {
-    if (!this.page) return [];
-
-    const screenings: RawScreening[] = [];
-
-    try {
-      // Navigate to the film's page
-      const filmUrl = `${this.config.baseUrl}/en/movies/${film.url_key}`;
-      console.log(`[${this.config.cinemaId}] Fetching screenings for "${film.movie_name}"...`);
-
-      await this.page.goto(filmUrl, {
-        waitUntil: "networkidle",
-        timeout: 30000,
-      });
-
-      await this.page.waitForTimeout(3000);
-
-      // Get page content
-      const html = await this.page.content();
-      const $ = cheerio.load(html);
-
-      // CineSync sites typically show showtimes in buttons or links with session info
-      // Look for session/showtime elements
-
-      // Try various selectors that CineSync sites commonly use
-      const sessionSelectors = [
-        'button[data-session-id]',
-        'a[href*="session"]',
-        '[class*="showtime"]',
-        '[class*="session"]',
-        'button[class*="time"]',
-        'a[class*="time"]',
-      ];
-
-      let foundSessions = false;
-
-      for (const selector of sessionSelectors) {
-        const elements = $(selector);
-        if (elements.length > 0) {
-          foundSessions = true;
-
-          elements.each((_, el) => {
-            const $el = $(el);
-
-            // Try to extract datetime from the element or its data attributes
-            const sessionId = $el.attr("data-session-id") || $el.attr("data-id") || "";
-            const timeText = $el.text().trim();
-
-            // Look for date in parent/sibling elements
-            const $parent = $el.closest('[data-date], [class*="date"]');
-            const dateText = $parent.attr("data-date") || $parent.text().match(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}-\d{2}-\d{2}/)?.[0] || "";
-
-            // Try to parse the datetime
-            const datetime = this.parseShowtimeDateTime(dateText, timeText);
-
-            if (datetime && datetime <= endDate && datetime > new Date()) {
-              // Build booking URL
-              let bookingUrl = $el.attr("href") || "";
-              if (!bookingUrl || !bookingUrl.startsWith("http")) {
-                bookingUrl = `${this.config.baseUrl}/en/movies/${film.url_key}?showtime=${sessionId}`;
-              }
-
-              const sourceId = `romford-lumiere-${sessionId || this.slugify(film.movie_name)}-${datetime.toISOString()}`;
-
-              screenings.push({
-                filmTitle: this.cleanTitle(film.movie_name),
-                datetime,
-                bookingUrl,
-                sourceId,
-                year: film.release_date ? this.extractYear(film.release_date) : undefined,
-                director: film.director,
-              });
-            }
-          });
-
-          break;
-        }
-      }
-
-      // If no sessions found via selectors, try parsing from the page text
-      if (!foundSessions) {
-        const pageScreenings = await this.parseScreeningsFromPageText($, film, endDate);
-        screenings.push(...pageScreenings);
-      }
-
-      console.log(`[${this.config.cinemaId}] Found ${screenings.length} screenings for "${film.movie_name}"`);
-    } catch (error) {
-      console.warn(`[${this.config.cinemaId}] Error fetching film screenings:`, error);
-    }
-
-    return screenings;
-  }
-
-  private async parseScreeningsFromPageText(
-    $: ReturnType<typeof cheerio.load>,
-    film: CineSyncMovieData,
-    endDate: Date
-  ): Promise<RawScreening[]> {
+  private convertToScreenings(endDate: Date): RawScreening[] {
     const screenings: RawScreening[] = [];
     const now = new Date();
 
-    // Look for date headings and time buttons
-    // Common patterns in cinema sites: date headers followed by time buttons
-    const dateBlocks = $('[class*="date"], [class*="day"], h3, h4').filter((_, el) => {
-      const text = $(el).text();
-      // Check if this looks like a date
-      return /\d{1,2}|\w+day|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(text);
-    });
+    for (const session of this.capturedSessions) {
+      // Get the movie for this session
+      const movie = this.capturedMovies.get(session.movie_id);
+      if (!movie) {
+        console.warn(`[${this.config.cinemaId}] Movie not found for session ${session.id}, movie_id: ${session.movie_id}`);
+        continue;
+      }
 
-    dateBlocks.each((_, dateEl) => {
-      const dateText = $(dateEl).text().trim();
+      // Parse the session datetime
+      let datetime: Date | null = null;
 
-      // Find times near this date
-      const $container = $(dateEl).parent();
-      const timeElements = $container.find('button, a').filter((_, el) => {
-        const text = $(el).text().trim();
-        // Check if this looks like a time (e.g., "14:30", "2:30pm", "2:30 PM")
-        return /^\d{1,2}[:.]\d{2}\s*(?:am|pm)?$/i.test(text);
-      });
-
-      timeElements.each((_, timeEl) => {
-        const timeText = $(timeEl).text().trim();
-        const datetime = this.parseShowtimeDateTime(dateText, timeText);
-
-        if (datetime && datetime > now && datetime <= endDate) {
-          const sourceId = `romford-lumiere-${this.slugify(film.movie_name)}-${datetime.toISOString()}`;
-
-          screenings.push({
-            filmTitle: this.cleanTitle(film.movie_name),
-            datetime,
-            bookingUrl: `${this.config.baseUrl}/en/movies/${film.url_key}`,
-            sourceId,
-          });
-        }
-      });
-    });
-
-    return screenings;
-  }
-
-  private async extractScreeningsDirectly(): Promise<RawScreening[]> {
-    if (!this.page) return [];
-
-    const screenings: RawScreening[] = [];
-    const now = new Date();
-    const endOfApril = new Date(2026, 3, 30);
-
-    try {
-      const html = await this.page.content();
-      const $ = cheerio.load(html);
-
-      // Look for any structured screening data
-      // This is a fallback when we can't find individual film pages
-
-      // Try to find JSON-LD data (many cinema sites include this)
-      $('script[type="application/ld+json"]').each((_, el) => {
+      if (session.session_datetime) {
+        datetime = new Date(session.session_datetime);
+      } else if (session.session_date && session.session_time) {
+        // Combine date and time
         try {
-          const jsonText = $(el).html();
-          if (!jsonText) return;
-
-          const data = JSON.parse(jsonText);
-          if (data["@type"] === "MovieTheater" || data["@type"] === "Movie") {
-            // Parse structured data if available
-            console.log(`[${this.config.cinemaId}] Found JSON-LD data`);
-          }
+          datetime = parse(
+            `${session.session_date} ${session.session_time}`,
+            "yyyy-MM-dd HH:mm",
+            new Date()
+          );
         } catch {
-          // Ignore JSON parse errors
+          console.warn(`[${this.config.cinemaId}] Could not parse date/time: ${session.session_date} ${session.session_time}`);
         }
+      }
+
+      if (!datetime || isNaN(datetime.getTime())) {
+        console.warn(`[${this.config.cinemaId}] Invalid datetime for session ${session.id}`);
+        continue;
+      }
+
+      // Skip past screenings and screenings after end date
+      if (datetime < now || datetime > endDate) {
+        continue;
+      }
+
+      // Build booking URL
+      const bookingUrl = session.booking_url ||
+        `${this.config.baseUrl}/en/movies/${movie.url_key}?session=${session.id}`;
+
+      const sourceId = `romford-lumiere-${session.id}`;
+
+      screenings.push({
+        filmTitle: this.cleanTitle(movie.name),
+        datetime,
+        bookingUrl,
+        sourceId,
+        screen: session.screen_name,
+        format: session.format,
+        year: movie.release_date ? this.extractYear(movie.release_date) : undefined,
+        director: movie.director,
       });
-
-      // Look for any visible film/time combinations
-      $('[class*="film"], [class*="movie"]').each((_, el) => {
-        const $el = $(el);
-        const titleEl = $el.find('[class*="title"], h2, h3, h4').first();
-        const title = titleEl.text().trim();
-
-        if (!title || title.length < 2) return;
-
-        // Look for times within this film card
-        $el.find('[class*="time"], button, a').each((_, timeEl) => {
-          const timeText = $(timeEl).text().trim();
-          if (/^\d{1,2}[:.]\d{2}\s*(?:am|pm)?$/i.test(timeText)) {
-            // Found a time - try to determine the date
-            const dateEl = $el.find('[class*="date"]').first();
-            const dateText = dateEl.text().trim() || format(now, "yyyy-MM-dd");
-
-            const datetime = this.parseShowtimeDateTime(dateText, timeText);
-
-            if (datetime && datetime > now && datetime <= endOfApril) {
-              const sourceId = `romford-lumiere-${this.slugify(title)}-${datetime.toISOString()}`;
-
-              screenings.push({
-                filmTitle: this.cleanTitle(title),
-                datetime,
-                bookingUrl: `${this.config.baseUrl}/en/buy-tickets`,
-                sourceId,
-              });
-            }
-          }
-        });
-      });
-
-    } catch (error) {
-      console.warn(`[${this.config.cinemaId}] Error in direct extraction:`, error);
     }
 
     return screenings;
-  }
-
-  private parseShowtimeDateTime(dateText: string, timeText: string): Date | null {
-    const now = new Date();
-
-    try {
-      // Clean up the inputs
-      dateText = dateText.toLowerCase().trim();
-      timeText = timeText.toLowerCase().trim();
-
-      // Parse the time first
-      let hours = 0;
-      let minutes = 0;
-
-      // Try various time formats
-      const time24Match = timeText.match(/^(\d{1,2})[:.:](\d{2})$/);
-      const time12Match = timeText.match(/^(\d{1,2})[:.:](\d{2})\s*(am|pm)?$/i);
-
-      if (time24Match) {
-        hours = parseInt(time24Match[1]);
-        minutes = parseInt(time24Match[2]);
-        // If hours are 1-9 and no am/pm, assume PM (per scraping rules)
-        if (hours >= 1 && hours <= 9) {
-          hours += 12;
-        }
-      } else if (time12Match) {
-        hours = parseInt(time12Match[1]);
-        minutes = parseInt(time12Match[2]);
-        const period = time12Match[3]?.toLowerCase();
-
-        if (period === "pm" && hours !== 12) {
-          hours += 12;
-        } else if (period === "am" && hours === 12) {
-          hours = 0;
-        } else if (!period && hours >= 1 && hours <= 9) {
-          // No AM/PM indicator and hour is 1-9, assume PM
-          hours += 12;
-        }
-      } else {
-        return null;
-      }
-
-      // Validate time
-      if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-        return null;
-      }
-
-      // Warn about early times (likely parsing errors)
-      if (hours < 10) {
-        console.warn(`[${this.config.cinemaId}] Unusual early time: ${hours}:${minutes.toString().padStart(2, "0")}`);
-      }
-
-      // Parse the date
-      let targetDate: Date;
-
-      // Try ISO format (2026-01-20)
-      const isoMatch = dateText.match(/(\d{4})-(\d{2})-(\d{2})/);
-      if (isoMatch) {
-        targetDate = new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
-      } else {
-        // Try UK format (20/01/2026 or 20-01-2026)
-        const ukMatch = dateText.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
-        if (ukMatch) {
-          const day = parseInt(ukMatch[1]);
-          const month = parseInt(ukMatch[2]) - 1;
-          let year = parseInt(ukMatch[3]);
-          if (year < 100) year += 2000;
-          targetDate = new Date(year, month, day);
-        } else {
-          // Try text format (Monday 20 January, 20 Jan, Jan 20, etc.)
-          const monthNames: Record<string, number> = {
-            jan: 0, january: 0,
-            feb: 1, february: 1,
-            mar: 2, march: 2,
-            apr: 3, april: 3,
-            may: 4,
-            jun: 5, june: 5,
-            jul: 6, july: 6,
-            aug: 7, august: 7,
-            sep: 8, september: 8,
-            oct: 9, october: 9,
-            nov: 10, november: 10,
-            dec: 11, december: 11,
-          };
-
-          let foundMonth: number | null = null;
-          let foundDay: number | null = null;
-
-          for (const [name, month] of Object.entries(monthNames)) {
-            if (dateText.includes(name)) {
-              foundMonth = month;
-              break;
-            }
-          }
-
-          const dayMatch = dateText.match(/\b(\d{1,2})\b/);
-          if (dayMatch) {
-            foundDay = parseInt(dayMatch[1]);
-          }
-
-          if (foundMonth !== null && foundDay !== null) {
-            // Assume current or next year
-            const year = now.getFullYear();
-            targetDate = new Date(year, foundMonth, foundDay);
-
-            // If the date is in the past, try next year
-            if (targetDate < now) {
-              targetDate = new Date(year + 1, foundMonth, foundDay);
-            }
-          } else {
-            // Can't parse the date, use today
-            targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          }
-        }
-      }
-
-      // Set the time
-      targetDate.setHours(hours, minutes, 0, 0);
-
-      return targetDate;
-    } catch {
-      return null;
-    }
   }
 
   private cleanTitle(title: string): string {
@@ -552,14 +355,6 @@ export class RomfordLumiereScraper {
       .replace(/\s*\(.*?\)\s*$/, "")
       .replace(/\s+/g, " ")
       .trim();
-  }
-
-  private slugify(title: string): string {
-    return title
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .substring(0, 50);
   }
 
   private extractYear(dateStr: string): number | undefined {
