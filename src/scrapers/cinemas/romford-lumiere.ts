@@ -17,6 +17,7 @@
 
 import * as cheerio from "cheerio";
 import type { RawScreening, ScraperConfig } from "../types";
+import type { CheerioAPI } from "../utils/cheerio-types";
 import { getBrowser, closeBrowser, createPage } from "../utils/browser";
 import type { Page } from "playwright";
 import { addDays, parse, format } from "date-fns";
@@ -307,7 +308,7 @@ export class RomfordLumiereScraper {
   }
 
   private async parseScreeningsFromPageText(
-    $: cheerio.CheerioAPI,
+    $: CheerioAPI,
     film: CineSyncMovieData,
     endDate: Date
   ): Promise<RawScreening[]> {
