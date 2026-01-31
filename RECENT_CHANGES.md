@@ -6,7 +6,7 @@ When an entry is added here, also create a detailed file in /changelogs/
 -->
 
 ## 2026-01-31: Fix Screening Time Filtering
-**PR**: #52 | **Files**: `src/app/page.tsx`, `src/app/api/screenings/route.ts`, `src/app/api/films/search/route.ts`
+**PR**: #54 | **Files**: `src/app/page.tsx`, `src/app/api/screenings/route.ts`, `src/app/api/films/search/route.ts`
 - Fixed critical bug where past screenings were shown until midnight
 - Changed `startOfDay(now)` to `now` in public-facing queries
 - Home page and API now only show screenings that haven't started yet

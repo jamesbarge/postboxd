@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { startOfDay, endOfDay, addDays } from "date-fns";
+import { endOfDay, addDays } from "date-fns";
 import { z } from "zod";
 import type { ScreeningFormat } from "@/types/screening";
 import { BadRequestError, handleApiError } from "@/lib/api-errors";
