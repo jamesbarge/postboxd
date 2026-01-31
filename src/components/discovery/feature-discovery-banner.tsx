@@ -71,6 +71,10 @@ export function FeatureDiscoveryBanner() {
   // 1. Returning users (majority of traffic) have dismissed/visited features
   // 2. Showing a placeholder for them would cause MORE CLS (placeholder → nothing)
   // 3. New users see a one-time CLS when banner appears, but this is acceptable
+  // Discovery banner disabled — return early unconditionally.
+  // To re-enable, remove this early return.
+  return null;
+
   if (!hydrated || !shouldShow) {
     return null;
   }
