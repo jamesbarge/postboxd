@@ -5,6 +5,23 @@ AI CONTEXT FILE - Keep last ~20 entries. Add new entries at top.
 When an entry is added here, also create a detailed file in /changelogs/
 -->
 
+## 2026-02-01: Fallback Film Enrichment System
+**PR**: TBD | **Files**: `src/agents/fallback-enrichment/`, `src/scripts/audit-film-data.ts`, `src/app/admin/data-quality/`
+- New fallback enrichment agent fills metadata gaps for films without TMDB matches
+- Uses Claude Haiku + booking page scraping + Letterboxd discovery
+- Confidence scoring: >0.8 auto-applies, lower queued for review
+- CLI: `npm run audit:films` and `npm run agents:fallback-enrich`
+- Admin dashboard at `/admin/data-quality`
+
+---
+
+## 2026-02-01: Railway Migration Plan
+**PR**: TBD | **Files**: `docs/plans/2026-02-01-railway-migration.md`
+- Added an exhaustive Railway migration plan covering services, cron, scrapers, and cutover
+- Included resilience improvements, monitoring, and verification steps
+
+---
+
 ## 2026-01-31: Fix Screening Time Filtering
 **PR**: #54 | **Files**: `src/app/page.tsx`, `src/app/api/screenings/route.ts`, `src/app/api/films/search/route.ts`
 - Fixed critical bug where past screenings were shown until midnight
