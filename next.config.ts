@@ -32,6 +32,18 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.savoysystems.co.uk",
       },
+      {
+        protocol: "https",
+        hostname: "player.bfi.org.uk",
+      },
+      {
+        protocol: "https",
+        hostname: "d13jj08vfqimqg.cloudfront.net",
+      },
+      {
+        protocol: "https",
+        hostname: "ticketlab.co.uk",
+      },
     ],
   },
   // Reverse proxy for PostHog to avoid ad blockers
