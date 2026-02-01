@@ -5,6 +5,13 @@ AI CONTEXT FILE - Keep last ~20 entries. Add new entries at top.
 When an entry is added here, also create a detailed file in /changelogs/
 -->
 
+## 2026-02-01: Allow Additional Poster Domains
+**PR**: #XX | **Files**: `next.config.ts`
+- Added poster host allowlist entries for non-TMDB images
+- Fixes missing calendar posters for films using external sources
+
+---
+
 ## 2026-01-31: Fix Screening Time Filtering
 **PR**: #54 | **Files**: `src/app/page.tsx`, `src/app/api/screenings/route.ts`, `src/app/api/films/search/route.ts`
 - Fixed critical bug where past screenings were shown until midnight
